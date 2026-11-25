@@ -1,0 +1,13 @@
+/// Which year of the city's own report a figure is: Latest (the report's fiscal year, FY2025 for 52 cities, FY2024 for Bakersfield and Redmond) or Prior (the same report's comparative column). The safe way to compare every city on its latest audited year.
+table 'Year Position'
+
+	/// Latest or Prior. Primary key.
+	column 'Year Position'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Year Position
+
+	partition 'Year Position' = m
+		mode: import
+		source = #table(type table [Year Position = text], {{"Latest"}, {"Prior"}})

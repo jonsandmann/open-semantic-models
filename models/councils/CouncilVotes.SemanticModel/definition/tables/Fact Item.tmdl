@@ -1,0 +1,203 @@
+/// Fact table: one row per agenda line at a full-council meeting (a line with a title or a matter), 24 Nov 2025 to 24 Nov 2026, eight councils. Roll-call columns come from the factory's item_votes: Denver, Oakland and Phoenix take one roll call for a block of items and copy it onto every item, so unanimity is measured two ways (per item and per roll call, the distinct Roll Call Key). Every column is hidden; analysis goes through the measures and the dimensions.
+table 'Fact Item'
+
+	/// Agenda lines in context, decided or not. Bellevue and San José have agenda lines only.
+	measure 'Agenda Items' = COUNTROWS ( 'Fact Item' )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Agenda lines whose recorded action is a decision (passed, adopted, approved, failed and the factory's short list in fetch.py). Zero for Bellevue and San José, whose API records no actions.
+	measure 'Decided Items' = CALCULATE ( [Agenda Items], KEEPFILTERS ( 'Fact Item'[Decided] = 1 ) )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Decided items with a recorded roll call. A block roll call counts once per item it covers.
+	measure 'Items with Roll Call' = CALCULATE ( [Agenda Items], KEEPFILTERS ( NOT ISBLANK ( 'Fact Item'[Roll Call Key] ) ) )
+		formatString: #,0
+		displayFolder: Roll Calls
+
+	/// Distinct roll calls (the item's smallest VoteId): the times members actually voted. A block of 40 consent items is one roll call.
+	measure 'Roll Calls' = DISTINCTCOUNTNOBLANK ( 'Fact Item'[Roll Call Key] )
+		formatString: #,0
+		displayFolder: Roll Calls
+
+	/// Items with a roll call that had at least one yes and no no votes.
+	measure 'Unanimous Items' = CALCULATE ( [Items with Roll Call], KEEPFILTERS ( 'Fact Item'[Unanimous] = 1 ) )
+		formatString: #,0
+		displayFolder: Roll Calls
+
+	/// Unanimous Items over Items with Roll Call: the flattering count, since a block roll call repeats on every item in it (Denver 89.9%).
+	measure 'Unanimous Share per Item' = DIVIDE ( COALESCE ( [Unanimous Items], 0 ), [Items with Roll Call] )
+		formatString: 0.0%
+		displayFolder: Roll Calls
+
+	/// Distinct roll calls with at least one yes and no no votes.
+	measure 'Unanimous Roll Calls' = CALCULATE ( [Roll Calls], KEEPFILTERS ( 'Fact Item'[Unanimous] = 1 ) )
+		formatString: #,0
+		displayFolder: Roll Calls
+
+	/// Unanimous Roll Calls over Roll Calls: how often the council was unanimous when it actually voted (Denver 60.6%, Oakland 69.6%, Seattle 96.7%). Madison records roll calls only when contested and Boston none, so their figures are artifacts or blank.
+	measure 'Unanimous Share per Roll Call' = DIVIDE ( COALESCE ( [Unanimous Roll Calls], 0 ), [Roll Calls] )
+		formatString: 0.0%
+		displayFolder: Roll Calls
+
+	/// Share of roll-call items decided in a block with other items.
+	measure 'Share of Roll-Call Items in Blocks' = DIVIDE ( COALESCE ( CALCULATE ( [Items with Roll Call], KEEPFILTERS ( 'Fact Item'[Block Size] > 1 ) ), 0 ), [Items with Roll Call] )
+		formatString: 0.0%
+		displayFolder: Roll Calls
+
+	/// Items voted on their own (block size 1). Being voted alone is itself selected for controversy.
+	measure 'Own-Vote Roll Calls' = CALCULATE ( [Items with Roll Call], KEEPFILTERS ( 'Fact Item'[Block Size] = 1 ) )
+		formatString: #,0
+		displayFolder: Roll Calls
+
+	/// Share of items voted on their own that drew a no vote (or had no yes). Measures what gets pulled for its own vote, not what is controversial in general; topic labels are about 70 to 77% right.
+	measure 'Split Share of Own Votes' = DIVIDE ( COALESCE ( CALCULATE ( [Own-Vote Roll Calls], KEEPFILTERS ( 'Fact Item'[Unanimous] = 0 ) ), 0 ), [Own-Vote Roll Calls] )
+		formatString: 0.0%
+		displayFolder: Roll Calls
+
+	/// Decided items carrying Legistar's own consent flag (not a guess from the title). Seattle, Madison and Boston barely use the flag.
+	measure 'Consent Items' = CALCULATE ( [Decided Items], KEEPFILTERS ( 'Fact Item'[Consent] = 1 ) )
+		formatString: #,0
+		displayFolder: Consent
+
+	/// Consent Items over Decided Items (Oakland 82.7%).
+	measure 'Consent Share of Decided' = DIVIDE ( COALESCE ( [Consent Items], 0 ), [Decided Items] )
+		formatString: 0.0%
+		displayFolder: Consent
+
+	/// Unanimous Share per Item on consent items. Near 100% by construction: a member who objects pulls the item first.
+	measure 'Unanimous Share on Consent' = CALCULATE ( [Unanimous Share per Item], KEEPFILTERS ( 'Fact Item'[Consent] = 1 ) )
+		formatString: 0.0%
+		displayFolder: Consent
+
+	/// Unanimous Share per Item on items not on consent (Oakland 63.5%, Denver 56.0%).
+	measure 'Unanimous Share off Consent' = CALCULATE ( [Unanimous Share per Item], KEEPFILTERS ( 'Fact Item'[Consent] = 0 ) )
+		formatString: 0.0%
+		displayFolder: Consent
+
+	/// First dollar figure in the titles of decided items, each city and matter counted once. Leaves out Oakland's resolution on state Prop 1 ($11.25 billion) and a Boston request for information on $558.7 million of ARPA money, neither a city spending decision. A title figure is not an appropriation; contract totals include grants and developer agreements the topic regex filed under contract.
+	measure 'Decided Dollars' = SUM ( 'Fact Item'[Money Counted] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Money
+
+	/// Decided items (each matter once) that carry a dollar figure counted in Decided Dollars.
+	measure 'Items with Dollar Figure' = CALCULATE ( [Agenda Items], KEEPFILTERS ( NOT ISBLANK ( 'Fact Item'[Money Counted] ) ) )
+		formatString: #,0
+		displayFolder: Money
+
+	/// Median of the title dollar figures counted in Decided Dollars (contracts $1.0 million).
+	measure 'Median Dollar Figure' = MEDIAN ( 'Fact Item'[Money Counted] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Money
+
+	/// Attribution for reports built from this model.
+	measure Attribution = "City council meeting records from each city's Legistar public Web API (Seattle, Bellevue, Oakland, Boston, Madison, Denver, Phoenix, San José), 24 Nov 2025 to 24 Nov 2026, full council only. Joined by our data factory."
+		formatString: @
+		displayFolder: About
+
+	/// City and Legistar EventItemId, unique.
+	column 'Item Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Item Key
+
+	/// Legistar client, related to City.
+	column City
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Meeting date (the calendar date Legistar stores), related to Date.
+	column 'Meeting Date'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Meeting Date
+
+	/// Topic code, related to Topic.
+	column Topic
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Topic
+
+	/// 1 when the recorded action is a decision.
+	column Decided
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Decided
+
+	/// 1 when Legistar's consent flag is set.
+	column Consent
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Consent
+
+	/// First dollar figure in the title, as parsed. Repeats across readings of one matter; do not sum. Use Decided Dollars.
+	column 'Money USD'
+		isAvailableInMdx: false
+		dataType: decimal
+		formatString: \$#,0;(\$#,0);\$#,0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Money USD
+
+	/// Money USD on decided items, first appearance of each city and matter only, minus the two non-city figures.
+	column 'Money Counted'
+		isAvailableInMdx: false
+		dataType: decimal
+		formatString: \$#,0;(\$#,0);\$#,0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Money Counted
+
+	/// City and the item's smallest VoteId; shared by every item in a block roll call. Blank without a roll call.
+	column 'Roll Call Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Roll Call Key
+
+	/// Items sharing this roll call (1 = voted on its own).
+	column 'Block Size'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Block Size
+
+	/// 1 when the roll call had at least one yes and no no.
+	column Unanimous
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Unanimous
+
+	partition 'Fact Item' = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(CouncilFiles{[Name = "items.parquet"]}[Content]),
+					Kept = Table.SelectColumns(Raw, {"item_key", "city", "meeting_date", "topic", "decided", "consent", "money_usd", "money_counted", "roll_call_key", "block_size", "unanimous"}),
+					Renamed = Table.RenameColumns(Kept, {{"item_key", "Item Key"}, {"city", "City"}, {"meeting_date", "Meeting Date"}, {"topic", "Topic"}, {"decided", "Decided"}, {"consent", "Consent"}, {"money_usd", "Money USD"}, {"money_counted", "Money Counted"}, {"roll_call_key", "Roll Call Key"}, {"block_size", "Block Size"}, {"unanimous", "Unanimous"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Item Key", type text}, {"City", type text}, {"Meeting Date", type date}, {"Topic", type text}, {"Decided", Int64.Type}, {"Consent", Int64.Type}, {"Money USD", Currency.Type}, {"Money Counted", Currency.Type}, {"Roll Call Key", type text}, {"Block Size", Int64.Type}, {"Unanimous", Int64.Type}})
+				in
+					Typed

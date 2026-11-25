@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "City Finances (ACFR)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "41ead155-4706-4033-9ff5-e8177e4cdb0e"
+  }
+}

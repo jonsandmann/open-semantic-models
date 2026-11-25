@@ -1,0 +1,32 @@
+/// Department or division as each city publishes it (1,440 city x department pairs). Not comparable across cities: use Function for that. Chicago leaves it blank on ~58% of dollars ((blank)); Kansas City publishes cost-centre names.
+table Department
+
+	/// Integer surrogate key. Primary key.
+	column 'Department Key'
+		dataType: int64
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Department Key
+
+	/// Department as published, or (blank).
+	column Department
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Department
+
+	/// City slug the department belongs to. Descriptive only: filter cities through City.
+	column 'Department City'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Department City
+
+	partition Department = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(SpendingFiles{[Name = "departments.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"department_key", "Department Key"}, {"city", "Department City"}, {"department", "Department"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Department Key", Int64.Type}, {"Department City", type text}, {"Department", type text}})
+				in
+					Typed

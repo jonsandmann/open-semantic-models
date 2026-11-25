@@ -1,0 +1,64 @@
+/// The nine cities whose checkbooks are in the join, one row each. Static table from the factory's schema.md, SOURCES.md and analyze.py (population: Census Vintage 2024, the same figures line 1 uses). Fiscal years differ: read Fiscal Year End and Fiscal Years Loaded before comparing cities.
+table City
+
+	/// City slug as stored on the fact, for example los-angeles. Primary key.
+	column City
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Display name with state, for example Los Angeles, CA.
+	column 'City Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: City Name
+
+	/// Two-letter postal code.
+	column State
+		dataType: string
+		summarizeBy: none
+		sourceColumn: State
+
+	/// Month and day the fiscal year ends (06-30, 09-30 or 12-31). Chicago and Kansas City are calendar years (Kansas City's own fiscal year is May to April; its open data is by calendar year).
+	column 'Fiscal Year End'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fiscal Year End
+
+	/// Fiscal years in the data. Dallas has one (FY2026); Chicago and Kansas City are 2024 and 2025; the rest 2025 and 2026.
+	column 'Fiscal Years Loaded'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fiscal Years Loaded
+
+	/// Census Vintage 2024 resident population. Denominator of Spending per Resident.
+	column Population
+		dataType: int64
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Population
+
+	/// What to know about this city's checkbook (from QUALITY.md).
+	column 'Source Note'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Source Note
+
+	partition City = m
+		mode: import
+		source =
+				#table(
+					type table [City = text, City Name = text, State = text, Fiscal Year End = text, Fiscal Years Loaded = text, Population = Int64.Type, Source Note = text],
+					{
+						{"chicago", "Chicago, IL", "IL", "12-31", "2024, 2025", 2721308, "Department blank on ~58% of dollars (19-23% unmapped); 2024 has 4,172 undated year-only aggregate rows"},
+						{"los-angeles", "Los Angeles, CA", "CA", "06-30", "2025, 2026", 3878704, "Invoice distribution lines; LAX pays from its own system and is almost absent"},
+						{"san-francisco", "San Francisco, CA", "CA", "06-30", "2025, 2026", 827526, "Voucher totals with no date; PUC (water, sewer and power) is one department"},
+						{"austin", "Austin, TX", "TX", "09-30", "2025, 2026", 993588, "Accounting lines without a line number repeat (11,578 identical rows, real)"},
+						{"dallas", "Dallas, TX", "TX", "09-30", "2026", 1326087, "One fiscal year only"},
+						{"kansas-city", "Kansas City, MO", "MO", "12-31", "2024, 2025", 516032, "Calendar years; voided and reissued payments (about -$180M a year of negatives)"},
+						{"cincinnati", "Cincinnati, OH", "OH", "06-30", "2025, 2026", 314915, ""},
+						{"atlanta", "Atlanta, GA", "GA", "06-30", "2025, 2026", 520070, "27% of lines repeat (no line number, real); FY2026 has -$276M of reversal pairs"},
+						{"boston", "Boston, MA", "MA", "06-30", "2025, 2026", 673458, "Published CSV files (Boston's datastore API holds FY2025 twice; not used)"}
+					}
+				)

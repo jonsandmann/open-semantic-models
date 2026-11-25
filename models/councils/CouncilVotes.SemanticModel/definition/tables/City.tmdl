@@ -1,0 +1,56 @@
+/// The eight councils in the pull, one row each, with what each one's Legistar API records. Static table from the factory's SOURCES.md and QUALITY.md. Read Roll Call Practice and Coverage before comparing cities: Bellevue and San José publish no actions or votes, Boston no roll calls, Madison roll calls only when contested, and Denver and Phoenix are partial.
+table City
+
+	/// Legistar client name as stored on the facts, for example seattle. Primary key.
+	column City
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Display name with state, for example Seattle, WA.
+	column 'City Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: City Name
+
+	/// Two-letter postal code.
+	column State
+		dataType: string
+		summarizeBy: none
+		sourceColumn: State
+
+	/// How the API records votes: one per item, blocks (one roll call for many items), contested only, or none.
+	column 'Roll Call Practice'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Roll Call Practice
+
+	/// True when the API carries the action on decided items (false for Bellevue and San José, so their decided-item counts are zero, not a finding).
+	column 'Records Actions'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Records Actions
+
+	/// Full or partial pull, with the meetings loaded out of the meetings held.
+	column Coverage
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Coverage
+
+	partition City = m
+		mode: import
+		source =
+				#table(
+					type table [City = text, City Name = text, State = text, Roll Call Practice = text, Records Actions = logical, Coverage = text],
+					{
+						{"seattle", "Seattle, WA", "WA", "one per item", true, "full: 42 meetings"},
+						{"bellevue", "Bellevue, WA", "WA", "none", false, "agenda only: 47 meetings, no actions or votes"},
+						{"oakland", "Oakland, CA", "CA", "blocks", true, "full: 21 meetings; latest weeks provisional (draft minutes)"},
+						{"boston", "Boston, MA", "MA", "none (voice votes)", true, "full: 32 council meetings, no roll calls"},
+						{"madison", "Madison, WI", "WI", "contested only", true, "full: 25 meetings; roll calls only when contested"},
+						{"denver", "Denver, CO", "CO", "blocks", true, "partial: items for 26 of 49 meetings (to 2026-06-01)"},
+						{"phoenix", "Phoenix, AZ", "AZ", "blocks", true, "partial: items for 5 of 22 meetings (Dec 2025 to Feb 2026)"},
+						{"sanjose", "San José, CA", "CA", "none", false, "agenda only: 57 meetings, no actions or votes"}
+					}
+				)

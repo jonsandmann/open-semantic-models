@@ -1,0 +1,25 @@
+/// Fiscal years in the data, named by the year the fiscal year ends in (July 2024 to June 2025 is 2025), the same convention as the city-finances line. The headline time axis: whole-year totals per city compare on this, not on Date.
+table 'Fiscal Year'
+
+	/// Fiscal year as a number, for example 2025. Primary key.
+	column 'Fiscal Year'
+		dataType: int64
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Fiscal Year
+
+	/// Label, for example FY2025.
+	column 'Fiscal Year Label'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fiscal Year Label
+		sortByColumn: 'Fiscal Year'
+
+	partition 'Fiscal Year' = m
+		mode: import
+		source =
+				#table(
+					type table [Fiscal Year = Int64.Type, Fiscal Year Label = text],
+					{ {2024, "FY2024"}, {2025, "FY2025"}, {2026, "FY2026"} }
+				)

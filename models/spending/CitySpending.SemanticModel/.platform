@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "City Spending"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "849ed6b2-ce91-4d78-b63d-32531d8b8b89"
+  }
+}

@@ -1,0 +1,29 @@
+// 1. How much is loaded? Meetings, agenda items, decided items, member vote rows, roll calls
+EVALUATE ROW ( "meetings", [Meetings], "items", [Agenda Items], "decided", [Decided Items], "vote_rows", [Member Vote Rows], "roll_calls", [Roll Calls] )
+
+// 2. Denver: unanimous per item vs per roll call
+EVALUATE CALCULATETABLE ( ROW ( "items_rc", [Items with Roll Call], "per_item", [Unanimous Share per Item], "roll_calls", [Roll Calls], "per_roll_call", [Unanimous Share per Roll Call] ), City[City] = "denver" )
+
+// 3. Oakland: unanimous per item vs per roll call
+EVALUATE CALCULATETABLE ( ROW ( "items_rc", [Items with Roll Call], "per_item", [Unanimous Share per Item], "roll_calls", [Roll Calls], "per_roll_call", [Unanimous Share per Roll Call] ), City[City] = "oakland" )
+
+// 4. Oakland: consent share of decided items; unanimous on and off consent
+EVALUATE CALCULATETABLE ( ROW ( "consent_share", [Consent Share of Decided], "on_consent", [Unanimous Share on Consent], "off_consent", [Unanimous Share off Consent] ), City[City] = "oakland" )
+
+// 5. Which topics carry the money? Top three by decided dollars
+EVALUATE TOPN ( 3, SUMMARIZECOLUMNS ( Topic[Topic], "items", [Items with Dollar Figure], "dollars", [Decided Dollars], "median", [Median Dollar Figure] ), [dollars], DESC )
+
+// 6. Contracts voted on their own: how many, and the share with a no vote (all cities)
+EVALUATE CALCULATETABLE ( ROW ( "own_votes", [Own-Vote Roll Calls], "split", [Split Share of Own Votes] ), Topic[Topic] = "contract" )
+
+// 7. Oakland: no votes and the top dissenter
+EVALUATE CALCULATETABLE ( ROW ( "no_votes", [No Votes], "top", [Top Dissenter], "top_no", [Top Dissenter No Votes], "share", [Top Dissenter Share] ), City[City] = "oakland" )
+
+// 8. Denver: no votes and the top dissenter
+EVALUATE CALCULATETABLE ( ROW ( "no_votes", [No Votes], "top", [Top Dissenter], "top_no", [Top Dissenter No Votes], "share", [Top Dissenter Share] ), City[City] = "denver" )
+
+// 9. Seattle: roll calls and unanimous share per roll call
+EVALUATE CALCULATETABLE ( ROW ( "roll_calls", [Roll Calls], "per_roll_call", [Unanimous Share per Roll Call] ), City[City] = "seattle" )
+
+// 10. Coverage: meetings and decided items by city; meetings in 2026 Q1 (Date)
+EVALUATE SUMMARIZECOLUMNS ( City[City], "meetings", [Meetings], "decided", [Decided Items], "q1_2026", CALCULATE ( [Meetings], 'Date'[Year Quarter] = "2026 Q1" ) )

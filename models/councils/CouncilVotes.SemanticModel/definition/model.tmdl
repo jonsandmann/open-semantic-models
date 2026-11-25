@@ -1,0 +1,27 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+	annotation __PBI_TimeIntelligenceEnabled = 0
+
+	annotation Attribution = City council meeting records from each city's Legistar public Web API (Seattle, Bellevue, Oakland, Boston, Madison, Denver, Phoenix, San José), 24 Nov 2025 to 24 Nov 2026, full council only. Public meeting records; no separate licence published.
+
+	annotation PBI_QueryOrder = ["CouncilsFolder","CouncilFiles","Calendar","Fact Item","Fact Vote","Fact Meeting","City","Member","Topic","Vote Value","Date"]
+
+ref table 'Fact Item'
+ref table 'Fact Vote'
+ref table 'Fact Meeting'
+ref table City
+ref table Member
+ref table Topic
+ref table 'Vote Value'
+ref table Date
+
+ref expression CouncilsFolder
+ref expression CouncilFiles
+ref expression Calendar

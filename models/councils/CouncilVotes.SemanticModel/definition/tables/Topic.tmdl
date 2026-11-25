@@ -1,0 +1,35 @@
+/// The factory's fixed list of 20 agenda topics: a first-match regex on the item title. A red-team hand check of 30 items found 70 to 77% right, with systematic misses (grants and developer agreements under contract, honorary street namings under transportation), so topic splits are directional.
+table Topic
+
+	/// Topic code as stored on the facts, for example contract. Primary key.
+	column Topic
+		isKey
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Topic
+
+	/// Display label.
+	column 'Topic Label'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Topic Label
+		sortByColumn: 'Topic Order'
+
+	/// Order of the topic in the factory's first-match list (procedural first).
+	column 'Topic Order'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Topic Order
+
+	partition Topic = m
+		mode: import
+		source =
+				let
+					Codes = {"procedural", "budget", "tax", "contract", "appointment", "housing", "homelessness", "transportation", "land use", "utilities", "parks", "public safety", "infrastructure", "environment", "health", "education", "labor", "arts", "equity", "other"},
+					Base = Table.FromList(Codes, Splitter.SplitByNothing(), type table [Topic = text]),
+					Indexed = Table.AddIndexColumn(Base, "Topic Order", 1, 1, Int64.Type),
+					Labelled = Table.AddColumn(Indexed, "Topic Label", each Text.Proper([Topic]), type text)
+				in
+					Labelled

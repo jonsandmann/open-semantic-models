@@ -1,0 +1,88 @@
+/// The figures the factory reads from each ACFR (cities/schema.md): the MD&A's condensed Changes in Net Position and Net Position tables (GASB 34 layout, primary government Total column) and two figures from the basic statements. Lines within a Statement and Section add up to that statement's Total only where the city's table_sums_ok passed; never add a Total to its parts (use the measures, which pick one figure each).
+table Figure
+
+	/// Figure id as stored on the fact, for example exp_public_safety. Primary key.
+	column 'Figure ID'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Figure ID
+
+	/// Display label. Sorted in statement order.
+	column 'Figure Label'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Figure Label
+		sortByColumn: 'Figure Order'
+
+	/// Revenues, Expenses, Net position or Basic statements.
+	column Statement
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Statement
+
+	/// Section within the statement: Total, Program revenues, General revenues: taxes, Governmental functions, Business-type functions, By activity type, Components, Unplaced line and so on.
+	column Section
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Section
+
+	/// Order of the figure in the statement.
+	column 'Figure Order'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Figure Order
+
+	partition Figure = m
+		mode: import
+		source =
+				#table(
+					type table [Figure ID = text, Figure Label = text, Statement = text, Section = text, Figure Order = Int64.Type],
+					{
+						{"rev_total", "Total revenues", "Revenues", "Total", 1},
+						{"rev_charges_for_services", "Charges for services", "Revenues", "Program revenues", 2},
+						{"rev_operating_grants", "Operating grants and contributions", "Revenues", "Program revenues", 3},
+						{"rev_capital_grants", "Capital grants and contributions", "Revenues", "Program revenues", 4},
+						{"rev_property_tax", "Property tax", "Revenues", "General revenues: taxes", 5},
+						{"rev_sales_tax", "Sales tax", "Revenues", "General revenues: taxes", 6},
+						{"rev_utility_tax", "Utility tax", "Revenues", "General revenues: taxes", 7},
+						{"rev_excise_tax", "Excise tax", "Revenues", "General revenues: taxes", 8},
+						{"rev_business_tax", "Business tax", "Revenues", "General revenues: taxes", 9},
+						{"rev_other_tax", "Other taxes", "Revenues", "General revenues: taxes", 10},
+						{"rev_investment_earnings", "Investment earnings", "Revenues", "General revenues: other", 11},
+						{"rev_miscellaneous", "Miscellaneous revenue", "Revenues", "General revenues: other", 12},
+						{"rev_other", "Other revenue line (label in Source Label)", "Revenues", "Unplaced line", 13},
+						{"rev_governmental_total", "Governmental activities revenues", "Revenues", "By activity type", 14},
+						{"rev_business_type_total", "Business-type activities revenues", "Revenues", "By activity type", 15},
+						{"exp_total", "Total expenses", "Expenses", "Total", 16},
+						{"exp_general_government", "General government", "Expenses", "Governmental functions", 17},
+						{"exp_judicial", "Judicial", "Expenses", "Governmental functions", 18},
+						{"exp_public_safety", "Public safety", "Expenses", "Governmental functions", 19},
+						{"exp_transportation", "Transportation and public works", "Expenses", "Governmental functions", 20},
+						{"exp_social_services", "Health and social services", "Expenses", "Governmental functions", 21},
+						{"exp_natural_economic_environment", "Economic and community development", "Expenses", "Governmental functions", 22},
+						{"exp_culture_recreation", "Culture and recreation", "Expenses", "Governmental functions", 23},
+						{"exp_physical_environment", "Physical environment", "Expenses", "Governmental functions", 24},
+						{"exp_utilities", "Utilities", "Expenses", "Governmental functions", 25},
+						{"exp_interest_on_debt", "Interest on long-term debt", "Expenses", "Governmental functions", 26},
+						{"exp_water_sewer", "Water and sewer", "Expenses", "Business-type functions", 27},
+						{"exp_surface_water", "Surface and storm water", "Expenses", "Business-type functions", 28},
+						{"exp_solid_waste", "Solid waste", "Expenses", "Business-type functions", 29},
+						{"exp_other", "Other expense line (label in Source Label)", "Expenses", "Unplaced line", 30},
+						{"exp_governmental_total", "Governmental activities expenses", "Expenses", "By activity type", 31},
+						{"exp_business_type_total", "Business-type activities expenses", "Expenses", "By activity type", 32},
+						{"np_total", "Total net position", "Net position", "Total", 33},
+						{"np_net_investment_in_capital_assets", "Net investment in capital assets", "Net position", "Components", 34},
+						{"np_restricted", "Restricted", "Net position", "Components", 35},
+						{"np_unrestricted", "Unrestricted", "Net position", "Components", 36},
+						{"np_other", "Other net position line", "Net position", "Unplaced line", 37},
+						{"np_governmental", "Governmental activities net position", "Net position", "By activity type", 38},
+						{"np_business_type", "Business-type activities net position", "Net position", "By activity type", 39},
+						{"total_assets", "Total assets", "Net position", "Balance", 40},
+						{"total_liabilities", "Total liabilities", "Net position", "Balance", 41},
+						{"net_pension_liability", "Net pension liability", "Basic statements", "Liability", 42},
+						{"general_fund_balance", "General fund balance", "Basic statements", "Fund balance", 43}
+					}
+				)

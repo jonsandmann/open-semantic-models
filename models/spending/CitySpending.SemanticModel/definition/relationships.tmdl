@@ -1,0 +1,24 @@
+relationship 'Fact Payment to Date'
+	fromColumn: 'Fact Payment'.'Payment Date'
+	toColumn: 'Date'.'Date'
+
+relationship 'Fact Payment to City'
+	fromColumn: 'Fact Payment'.'City'
+	toColumn: 'City'.'City'
+
+relationship 'Fact Payment to Fiscal Year'
+	fromColumn: 'Fact Payment'.'Fiscal Year'
+	toColumn: 'Fiscal Year'.'Fiscal Year'
+
+relationship 'Fact Payment to Vendor'
+	fromColumn: 'Fact Payment'.'Vendor Key'
+	toColumn: 'Vendor'.'Vendor Key'
+
+relationship 'Fact Payment to Department'
+	fromColumn: 'Fact Payment'.'Department Key'
+	toColumn: 'Department'.'Department Key'
+
+relationship 'Fact Payment to Function'
+	fromColumn: 'Fact Payment'.'Function'
+	toColumn: 'Function'.'Function'
+

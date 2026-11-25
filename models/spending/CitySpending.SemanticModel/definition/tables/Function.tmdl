@@ -1,0 +1,47 @@
+/// The factory's common functions (pipeline/crosswalk.csv: department rules, then fund rules, then vendor rules for Chicago's blank-department payments; first match wins), with the ACFR line each maps to in the city-finances line. A checkbook function is who got paid for that function's work, not what the function costs.
+table Function
+
+	/// Function code as stored on the fact, for example public_safety. Primary key.
+	column Function
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Function
+
+	/// Display label.
+	column 'Function Label'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Function Label
+
+	/// The ACFR expense figure this function maps to in the city-finances dataset (cities/schema.md), or none.
+	column 'ACFR Line'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: ACFR Line
+
+	partition Function = m
+		mode: import
+		source =
+				#table(
+					type table [Function = text, Function Label = text, ACFR Line = text],
+					{
+						{"general_government", "General government", "exp_general_government"},
+						{"judicial", "Judicial", "exp_judicial"},
+						{"public_safety", "Public safety", "exp_public_safety"},
+						{"transportation", "Transportation", "exp_transportation"},
+						{"health_human_services", "Health and human services", "exp_social_services"},
+						{"housing_community_dev", "Housing and community development", "exp_social_services or exp_natural_economic_environment"},
+						{"economic_development", "Economic development", "exp_natural_economic_environment"},
+						{"culture_recreation", "Culture and recreation", "exp_culture_recreation"},
+						{"environment", "Environment", "exp_physical_environment"},
+						{"education", "Education", "exp_other (Boston schools)"},
+						{"water_sewer", "Water and sewer", "exp_water_sewer + exp_surface_water"},
+						{"solid_waste", "Solid waste", "exp_solid_waste"},
+						{"electric_utility", "Electric utility", "exp_utilities"},
+						{"airports", "Airports", "exp_other (airport)"},
+						{"ports_harbor", "Ports and harbor", "exp_other (harbor)"},
+						{"benefits_debt_nondept", "Benefits, debt and non-departmental", "none (spread across functions; interest only)"},
+						{"unmapped", "Unmapped", "none"}
+					}
+				)

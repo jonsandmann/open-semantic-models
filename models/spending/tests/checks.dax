@@ -1,0 +1,32 @@
+// 1. How much is loaded? Lines, total, vendor spending, payees
+EVALUATE ROW ( "lines", [Payment Lines], "spending", [Spending], "vendor_spending", [Vendor Spending], "payees", [Payees] )
+
+// 2. Los Angeles FY2026: lines and total
+EVALUATE CALCULATETABLE ( ROW ( "lines", [Payment Lines], "spending", [Spending] ), City[City] = "los-angeles", 'Fiscal Year'[Fiscal Year] = 2026 )
+
+// 3. Atlanta FY2026: payees, vendor spending, top 10 and top 100 payee share
+EVALUATE CALCULATETABLE ( ROW ( "payees", [Payees], "vendor_spending", [Vendor Spending], "top10", [Top 10 Payee Share], "top100", [Top 100 Payee Share] ), City[City] = "atlanta", 'Fiscal Year'[Fiscal Year] = 2026 )
+
+// 4. Vendors paid by 3+ cities and their dollars; vendors paid by all nine
+EVALUATE ROW ( "multi_city", [Multi-City Vendors], "multi_city_spending", [Multi-City Vendor Spending], "all_nine", CALCULATE ( [Payees], Vendor[Cities Paid] = 9 ) )
+
+// 5. Motorola Solutions: cities paying, total, Chicago
+EVALUATE CALCULATETABLE ( ROW ( "cities", [Cities Paying], "total", [Vendor Spending], "chicago", CALCULATE ( [Vendor Spending], City[City] = "chicago" ) ), Vendor[Vendor] = "MOTOROLA SOLUTIONS" )
+
+// 6. Austin culture and recreation, FY2026 against FY2025
+EVALUATE CALCULATETABLE ( ROW ( "fy2026", [Spending], "fy2025", [Spending Prior FY], "yoy", [Spending YoY %] ), City[City] = "austin", 'Function'[Function] = "culture_recreation", 'Fiscal Year'[Fiscal Year] = 2026 )
+
+// 7. Atlanta: Axon and Motorola Solutions per resident, both years
+EVALUATE CALCULATETABLE ( ROW ( "spending", [Spending], "per_resident", [Spending per Resident] ), City[City] = "atlanta", Vendor[Vendor] IN { "AXON ENTERPRISE", "MOTOROLA SOLUTIONS" } )
+
+// 8. Chicago FY2025: unmapped share of absolute dollars
+EVALUATE CALCULATETABLE ( ROW ( "unmapped", [Unmapped Share] ), City[City] = "chicago", 'Fiscal Year'[Fiscal Year] = 2025 )
+
+// 9. Kansas City CY2024: reversals
+EVALUATE CALCULATETABLE ( ROW ( "reversals", [Reversals] ), City[City] = "kansas-city", 'Fiscal Year'[Fiscal Year] = 2024 )
+
+// 10. Boston, payments dated July to September 2025 (Date); San Francisco dated lines
+EVALUATE ROW (
+    "boston_q3", CALCULATE ( [Spending], City[City] = "boston", DATESBETWEEN ( 'Date'[Date], DATE ( 2025, 7, 1 ), DATE ( 2025, 9, 30 ) ) ),
+    "sf_dated", CALCULATE ( [Payment Lines], City[City] = "san-francisco", NOT ISBLANK ( 'Fact Payment'[Payment Date] ) )
+)

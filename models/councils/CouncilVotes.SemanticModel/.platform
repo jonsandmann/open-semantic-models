@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "City Council Votes"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "f686e5aa-296e-4799-acda-22302f59c123"
+  }
+}

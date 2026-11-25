@@ -1,0 +1,50 @@
+/// Fact table: one row per full-council meeting in the window (295), cancelled events dropped, Boston's committee hearings filed under the council body dropped. Denver and Phoenix list every meeting here even though only some have items loaded (City[Coverage]).
+table 'Fact Meeting'
+
+	/// Full-council meetings held in context.
+	measure Meetings = COUNTROWS ( 'Fact Meeting' )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// City and Legistar EventId.
+	column 'Meeting Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Meeting Key
+
+	/// Legistar client, related to City.
+	column City
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Meeting date, related to Date.
+	column 'Meeting Date'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Meeting Date
+
+	/// Legistar body name the meeting was filed under.
+	column Body
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Body
+
+	partition 'Fact Meeting' = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(CouncilFiles{[Name = "meetings.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"meeting_key", "Meeting Key"}, {"city", "City"}, {"meeting_date", "Meeting Date"}, {"body", "Body"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Meeting Key", type text}, {"City", type text}, {"Meeting Date", type date}, {"Body", type text}})
+				in
+					Typed

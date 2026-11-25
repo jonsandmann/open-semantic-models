@@ -1,0 +1,25 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+	annotation __PBI_TimeIntelligenceEnabled = 0
+
+	annotation Attribution = Read by our data factory from each city's audited Annual Comprehensive Financial Report (ACFR); every figure cites its PDF and page. Population: Census Bureau Vintage 2024.
+
+	annotation PBI_QueryOrder = ["FinancesFolder","FinanceFiles","Calendar","Fact Figure","City","Figure","Report","Year Position","Fiscal Year End"]
+
+ref table 'Fact Figure'
+ref table City
+ref table Figure
+ref table Report
+ref table 'Year Position'
+ref table 'Fiscal Year End'
+
+ref expression FinancesFolder
+ref expression FinanceFiles
+ref expression Calendar

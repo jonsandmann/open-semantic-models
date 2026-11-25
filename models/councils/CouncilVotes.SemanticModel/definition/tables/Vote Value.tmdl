@@ -1,0 +1,38 @@
+/// Each vote value as a city's clerk recorded it, grouped the way the factory's build.py tallies a roll call: Yes (In Favor, Aye, Yes), No (Opposed, No, Nay), Abstain (abstentions, Disqualified, Non Voting), Absent (Absent, Excused, Late arrival) and Other.
+table 'Vote Value'
+
+	/// Vote value as published, for example Aye. Primary key. (blank) where the API returned none.
+	column 'Vote Value'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Vote Value
+
+	/// Yes, No, Abstain, Absent or Other. Sorted by Vote Group Order.
+	column 'Vote Group'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Vote Group
+		sortByColumn: 'Vote Group Order'
+
+	/// Sort key for Vote Group.
+	column 'Vote Group Order'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Vote Group Order
+
+	partition 'Vote Value' = m
+		mode: import
+		source =
+				#table(
+					type table [Vote Value = text, Vote Group = text, Vote Group Order = Int64.Type],
+					{
+						{"In Favor", "Yes", 1}, {"Aye", "Yes", 1}, {"Yes", "Yes", 1},
+						{"Opposed", "No", 2}, {"No", "No", 2}, {"Nay", "No", 2},
+						{"Abstain", "Abstain", 3}, {"Abstained", "Abstain", 3}, {"Disqualified", "Abstain", 3}, {"Non Voting", "Abstain", 3},
+						{"Absent", "Absent", 4}, {"Absent(NV)", "Absent", 4}, {"Excused", "Absent", 4}, {"Late Arv(NV)", "Absent", 4},
+						{"Conflict", "Other", 5}, {"(blank)", "Other", 5}
+					}
+				)

@@ -1,0 +1,20 @@
+relationship 'Fact Figure to Fiscal Year End'
+	fromColumn: 'Fact Figure'.'Fiscal Year End'
+	toColumn: 'Fiscal Year End'.'Date'
+
+relationship 'Fact Figure to City'
+	fromColumn: 'Fact Figure'.'City Key'
+	toColumn: 'City'.'City Key'
+
+relationship 'Fact Figure to Figure'
+	fromColumn: 'Fact Figure'.'Figure ID'
+	toColumn: 'Figure'.'Figure ID'
+
+relationship 'Fact Figure to Report'
+	fromColumn: 'Fact Figure'.'Report Key'
+	toColumn: 'Report'.'Report Key'
+
+relationship 'Fact Figure to Year Position'
+	fromColumn: 'Fact Figure'.'Year Position'
+	toColumn: 'Year Position'.'Year Position'
+

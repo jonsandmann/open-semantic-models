@@ -1,0 +1,39 @@
+/// Payees by the factory's normalized vendor key (pipeline/vendors.py: deterministic, no fuzzy matching, a short hand-checked alias list), so one company joins across cities. 95,721 keys plus (no payee). Subsidiaries stay apart, names some systems cut at ~30 characters can split one company in two, and individuals (refunds, jurors, settlements) are kept as published.
+table Vendor
+
+	/// Integer surrogate key. Primary key. 0 is (no payee).
+	column 'Vendor Key'
+		dataType: int64
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Vendor Key
+
+	/// Normalized payee name, for example MOTOROLA SOLUTIONS.
+	column Vendor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Vendor
+
+	/// True when the name matches the factory's pass-through list (banks, trusts, pension and health plans, payroll, treasurers, other governments named STATE OF or COUNTY OF); such payees are left out of Vendor Spending. The red team found about $368M of title companies, health plans and federal agencies the list misses.
+	column 'Pass-Through'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Pass-Through
+
+	/// How many of the nine cities paid this payee as vendor spending, over both years. 938 payees have 3 or more; 18 have all nine.
+	column 'Cities Paid'
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Cities Paid
+
+	partition Vendor = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(SpendingFiles{[Name = "vendors.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"vendor_key", "Vendor Key"}, {"vendor", "Vendor"}, {"pass_through", "Pass-Through"}, {"cities_paid", "Cities Paid"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Vendor Key", Int64.Type}, {"Vendor", type text}, {"Pass-Through", type logical}, {"Cities Paid", Int64.Type}})
+				in
+					Typed

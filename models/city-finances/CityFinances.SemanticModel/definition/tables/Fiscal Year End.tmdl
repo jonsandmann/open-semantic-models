@@ -1,0 +1,95 @@
+/// Fiscal-year-end calendar: one row per day from 1 January 2023 to 31 December 2025, related to the fiscal year end of each figure (30 June, 30 September or 31 December). Marked as the model's date table. Year here is the fiscal year (the year the fiscal year ends in, the factory's convention), so a Year slicer compares cities whose years end in different months; use Year Position for each city's own latest report.
+table 'Fiscal Year End'
+	dataCategory: Time
+
+	/// Calendar date. Primary key, related to 'Fact Figure'[Fiscal Year End].
+	column Date
+		dataType: dateTime
+		isKey
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Date
+
+	/// Fiscal year: the calendar year the fiscal year ends in, for example 2025.
+	column Year
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year
+
+	/// Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+	column Quarter
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Quarter
+		sortByColumn: 'Quarter Number'
+
+	/// Quarter of the year as a number, 1 to 4.
+	column 'Quarter Number'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Quarter Number
+
+	/// Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+	column 'Year Quarter'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Year Quarter
+		sortByColumn: 'Year Quarter Number'
+
+	/// Sort key for Year Quarter: year times 10 plus quarter.
+	column 'Year Quarter Number'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year Quarter Number
+
+	/// Full month name, January to December. Sorted by Month Number.
+	column Month
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Month
+		sortByColumn: 'Month Number'
+
+	/// Abbreviated month name, Jan to Dec. Sorted by Month Number.
+	column 'Month Short'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Month Short
+		sortByColumn: 'Month Number'
+
+	/// Month of the year as a number, 1 to 12.
+	column 'Month Number'
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Month Number
+
+	/// Year and month as YYYY-MM. Sorted by Year Month Sort.
+	column 'Year Month'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Year Month
+		sortByColumn: 'Year Month Sort'
+
+	/// Sort key for Year Month: year times 100 plus month.
+	column 'Year Month Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year Month Sort
+
+	/// First day of the month the date falls in.
+	column 'Month Start'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Month Start
+
+	partition 'Fiscal Year End' = m
+		mode: import
+		source = Calendar

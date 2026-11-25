@@ -1,0 +1,33 @@
+/// One row per city and fiscal year read (108): the ACFR PDF each figure came from. With Fact Figure's page column hidden, use this table's Source PDF to check any number against the audited report.
+table Report
+
+	/// City FIPS place code and fiscal year, for example 5363000|2025. Primary key.
+	column 'Report Key'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Report Key
+
+	/// Last day of the fiscal year.
+	column 'Report Fiscal Year End'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Report Fiscal Year End
+
+	/// URL of the ACFR PDF the figures were read from (for a Prior year, the next year's report and its comparative column).
+	column 'Source PDF'
+		dataType: string
+		dataCategory: WebUrl
+		summarizeBy: none
+		sourceColumn: Source PDF
+
+	partition Report = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(FinanceFiles{[Name = "reports.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"report_key", "Report Key"}, {"fiscal_year_end", "Report Fiscal Year End"}, {"source_pdf_url", "Source PDF"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Report Key", type text}, {"Report Fiscal Year End", type date}, {"Source PDF", type text}})
+				in
+					Typed

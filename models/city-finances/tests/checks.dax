@@ -1,0 +1,29 @@
+// 1. How much is loaded? Figure rows, cities, hand-checked rows, cities passing every sum check
+EVALUATE ROW ( "rows", [Figures Read], "cities", [Cities Reporting], "hand_checked", [Hand-Checked Figures], "sums_ok", [Cities with Sums OK] )
+
+// 2. Seattle FY2025: total revenues, total expenses, net position
+EVALUATE CALCULATETABLE ( ROW ( "revenues", [Total Revenues], "expenses", [Total Expenses], "net_position", [Net Position] ), City[City] = "Seattle, WA", 'Fiscal Year End'[Year] = 2025 )
+
+// 3. Every city on its latest report: total expenses, cities, expenses per resident
+EVALUATE CALCULATETABLE ( ROW ( "expenses", [Total Expenses], "cities", [Cities Reporting], "per_resident", [Expenses per Resident] ), 'Year Position'[Year Position] = "Latest" )
+
+// 4. San Francisco FY2025 expenses per resident
+EVALUATE CALCULATETABLE ( ROW ( "per_resident", [Expenses per Resident] ), City[City] = "San Francisco, CA", 'Fiscal Year End'[Year] = 2025 )
+
+// 5. Los Angeles FY2025 total revenues, prior year, growth
+EVALUATE CALCULATETABLE ( ROW ( "fy2025", [Total Revenues], "fy2024", [Total Revenues Prior Year], "growth", [Revenue Growth %] ), City[City] = "Los Angeles, CA", 'Fiscal Year End'[Year] = 2025 )
+
+// 6. Latest report: cities with negative unrestricted net position, and the most negative
+EVALUATE CALCULATETABLE ( ROW ( "negative", [Cities with Negative Unrestricted Net Position], "lowest", MINX ( VALUES ( City[City] ), [Unrestricted Net Position] ) ), 'Year Position'[Year Position] = "Latest" )
+
+// 7. Phoenix FY2025 public safety share of total expenses
+EVALUATE CALCULATETABLE ( ROW ( "share", [Share of Total Expenses] ), City[City] = "Phoenix, AZ", 'Fiscal Year End'[Year] = 2025, Figure[Figure ID] = "exp_public_safety" )
+
+// 8. Seattle FY2025 business-type share of expenses
+EVALUATE CALCULATETABLE ( ROW ( "share", [Business-Type Share of Expenses] ), City[City] = "Seattle, WA", 'Fiscal Year End'[Year] = 2025 )
+
+// 9. Latest report: net pension liability, cities reporting it, per resident of those cities
+EVALUATE CALCULATETABLE ( ROW ( "npl", [Net Pension Liability], "cities", CALCULATE ( [Cities Reporting], Figure[Figure ID] = "net_pension_liability" ), "per_resident", [Net Pension Liability per Resident] ), 'Year Position'[Year Position] = "Latest" )
+
+// 10. Washington cities near Bellevue, latest report: cities and property tax share of revenues
+EVALUATE CALCULATETABLE ( ROW ( "cities", [Cities Reporting], "property_tax_share", [Property Tax Share of Revenues] ), City[City Group] = "Washington near Bellevue", 'Year Position'[Year Position] = "Latest" )

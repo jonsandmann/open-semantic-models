@@ -1,0 +1,31 @@
+/// Council members who appear on at least one roll call in the window (66). Built from votes.parquet; names have whitespace collapsed (Oakland's API pads some).
+table Member
+
+	/// City and Legistar person id, for example denver|517. Primary key.
+	column 'Member Key'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Member Key
+
+	/// Member name as the clerk recorded it.
+	column Member
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Member
+
+	/// Legistar client the member sits on. Descriptive only: filter cities through City.
+	column 'Member City'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Member City
+
+	partition Member = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(CouncilFiles{[Name = "members.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"member_key", "Member Key"}, {"person_name", "Member"}, {"city", "Member City"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Member Key", type text}, {"Member", type text}, {"Member City", type text}})
+				in
+					Typed

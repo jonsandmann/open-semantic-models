@@ -1,0 +1,56 @@
+/// The 59 cities attempted (the 50 largest US cities by Census Vintage 2024 population plus ten Washington cities near Bellevue; Seattle is in both), 54 of them in the data. In Data is false for New York, Philadelphia, Miami, Kent and Bothell (reports with image or unreadable tables; the factory's MISSING.md). Table Sums OK is false for the 8 cities whose extracted lines don't all add to the table totals: use their totals, not their lines.
+table City
+
+	/// 7-digit Census FIPS place code (state 2 + place 5). Primary key.
+	column 'City Key'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: City Key
+
+	/// City and state, for example Seattle, WA. Consolidated governments (Indianapolis, Louisville, Nashville) as a whole.
+	column City
+		dataType: string
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Two-letter postal code.
+	column State
+		dataType: string
+		summarizeBy: none
+		sourceColumn: State
+
+	/// Census Vintage 2024 population estimate. Denominator of every per-resident measure.
+	column Population
+		dataType: int64
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Population
+
+	/// Top 50 US city or Washington near Bellevue.
+	column 'City Group'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: City Group
+
+	/// True when the city's ACFR was read (54 of 59).
+	column 'In Data'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: In Data
+
+	/// True when every extractor sum check passed for the city (revenue lines = total revenues, expense lines = total expenses, net position parts = total, both activity types, both years). 46 of 54.
+	column 'Table Sums OK'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Table Sums OK
+
+	partition City = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(FinanceFiles{[Name = "cities.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"city_key", "City Key"}, {"city", "City"}, {"state", "State"}, {"population", "Population"}, {"city_group", "City Group"}, {"in_data", "In Data"}, {"table_sums_ok", "Table Sums OK"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"City Key", type text}, {"City", type text}, {"State", type text}, {"Population", Int64.Type}, {"City Group", type text}, {"In Data", type logical}, {"Table Sums OK", type logical}})
+				in
+					Typed

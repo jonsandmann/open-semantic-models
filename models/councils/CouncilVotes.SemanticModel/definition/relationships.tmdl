@@ -1,0 +1,40 @@
+relationship 'Fact Item to Date'
+	fromColumn: 'Fact Item'.'Meeting Date'
+	toColumn: 'Date'.'Date'
+
+relationship 'Fact Item to City'
+	fromColumn: 'Fact Item'.'City'
+	toColumn: 'City'.'City'
+
+relationship 'Fact Item to Topic'
+	fromColumn: 'Fact Item'.'Topic'
+	toColumn: 'Topic'.'Topic'
+
+relationship 'Fact Vote to Date'
+	fromColumn: 'Fact Vote'.'Meeting Date'
+	toColumn: 'Date'.'Date'
+
+relationship 'Fact Vote to City'
+	fromColumn: 'Fact Vote'.'City'
+	toColumn: 'City'.'City'
+
+relationship 'Fact Vote to Topic'
+	fromColumn: 'Fact Vote'.'Topic'
+	toColumn: 'Topic'.'Topic'
+
+relationship 'Fact Vote to Member'
+	fromColumn: 'Fact Vote'.'Member Key'
+	toColumn: 'Member'.'Member Key'
+
+relationship 'Fact Vote to Vote Value'
+	fromColumn: 'Fact Vote'.'Vote Value'
+	toColumn: 'Vote Value'.'Vote Value'
+
+relationship 'Fact Meeting to Date'
+	fromColumn: 'Fact Meeting'.'Meeting Date'
+	toColumn: 'Date'.'Date'
+
+relationship 'Fact Meeting to City'
+	fromColumn: 'Fact Meeting'.'City'
+	toColumn: 'City'.'City'
+

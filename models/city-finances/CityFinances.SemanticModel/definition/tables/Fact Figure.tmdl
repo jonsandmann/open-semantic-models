@@ -1,0 +1,260 @@
+/// Fact table: one row per city x fiscal year x figure read from the city's own audited ACFR (3,717 rows, 54 cities, each city's latest report and its prior-year column). Values are converted from the factory's USD millions (rounded to 0.01) to whole US dollars. Lines are additive only within a statement and only where the city's sums passed; the measures each pick one figure, so a visual never adds a total to its parts. Every column is hidden.
+table 'Fact Figure'
+
+	/// Sum of the figures in context, US dollars. Meaningful with one figure, or a set of lines from one section of one statement (put Figure on rows); never across a total and its parts.
+	measure 'Figure Value' = SUM ( 'Fact Figure'[Value USD] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Total revenues of the primary government (governmental + business-type), the MD&A's Changes in Net Position table.
+	measure 'Total Revenues' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "rev_total" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Total expenses of the primary government, accrual basis (payroll and pension expense and depreciation in; capital outlay and debt principal out).
+	measure 'Total Expenses' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "exp_total" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Total Revenues minus Total Expenses. Before transfers and special items, so not always the reported change in net position.
+	measure 'Revenues less Expenses' = IF ( NOT ISBLANK ( [Total Revenues] ) && NOT ISBLANK ( [Total Expenses] ), [Total Revenues] - [Total Expenses] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Total net position: assets and deferred outflows less liabilities and deferred inflows.
+	measure 'Net Position' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "np_total" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Unrestricted net position. Negative in most large cities, usually because pension and OPEB liabilities sit there.
+	measure 'Unrestricted Net Position' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "np_unrestricted" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Total assets from the condensed Net Position table (found for fewer cities; unchecked).
+	measure 'Total Assets' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "total_assets" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Total liabilities from the condensed Net Position table (found for fewer cities; unchecked).
+	measure 'Total Liabilities' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "total_liabilities" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Net pension liability, government-wide Statement of Net Position, primary-government Total column, every net pension liability row summed (assets not netted). Found for 19 city-years only; treat as unchecked.
+	measure 'Net Pension Liability' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "net_pension_liability" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Total fund balance of the General Fund, Balance Sheet for Governmental Funds (unchecked).
+	measure 'General Fund Balance' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "general_fund_balance" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Property tax line of general revenues.
+	measure 'Property Tax Revenue' = CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "rev_property_tax" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Figures
+
+	/// Figure Value over Total Expenses: put expense lines on rows (Phoenix public safety 30.7%). Cities name functions differently (labels are mapped by synonyms), so compare a function across cities with care.
+	measure 'Share of Total Expenses' = DIVIDE ( [Figure Value], CALCULATE ( [Total Expenses], REMOVEFILTERS ( Figure ) ) )
+		formatString: 0.0%
+		displayFolder: Shares
+
+	/// Figure Value over Total Revenues: put revenue lines on rows.
+	measure 'Share of Total Revenues' = DIVIDE ( [Figure Value], CALCULATE ( [Total Revenues], REMOVEFILTERS ( Figure ) ) )
+		formatString: 0.0%
+		displayFolder: Shares
+
+	/// Property Tax Revenue over Total Revenues. Across several cities, a city without a property tax line still counts in the denominator.
+	measure 'Property Tax Share of Revenues' = DIVIDE ( [Property Tax Revenue], [Total Revenues] )
+		formatString: 0.0%
+		displayFolder: Shares
+
+	/// Business-type activities expenses over Total Expenses: how much of the city runs as enterprises (Seattle City Light and utilities: 43%). Cities that hold an airport or utility outside the reporting entity show less.
+	measure 'Business-Type Share of Expenses' = DIVIDE ( CALCULATE ( [Figure Value], KEEPFILTERS ( Figure[Figure ID] = "exp_business_type_total" ) ), [Total Expenses] )
+		formatString: 0.0%
+		displayFolder: Shares
+
+	/// Most fiscal years any one city has in context. Per-resident measures are blank above 1 so two years never add.
+	measure 'Years per City' = MAXX ( VALUES ( City[City Key] ), CALCULATE ( DISTINCTCOUNT ( 'Fact Figure'[Fiscal Year End] ) ) )
+		formatString: 0
+		displayFolder: Per Resident
+
+	/// Total Revenues per Census Vintage 2024 resident, over the cities in context that report it. Blank unless each city has one fiscal year in context (use Year Position = Latest).
+	measure 'Revenues per Resident' = VAR Pop = SUMX ( FILTER ( City, NOT ISBLANK ( [Total Revenues] ) ), City[Population] ) RETURN IF ( [Years per City] <= 1, DIVIDE ( [Total Revenues], Pop ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Per Resident
+
+	/// Total Expenses per resident, over the cities in context that report it (54 cities, latest year: $4,352). San Francisco and Washington DC, which run county or state functions, sit at the top.
+	measure 'Expenses per Resident' = VAR Pop = SUMX ( FILTER ( City, NOT ISBLANK ( [Total Expenses] ) ), City[Population] ) RETURN IF ( [Years per City] <= 1, DIVIDE ( [Total Expenses], Pop ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Per Resident
+
+	/// Net Position per resident, over the cities in context that report it.
+	measure 'Net Position per Resident' = VAR Pop = SUMX ( FILTER ( City, NOT ISBLANK ( [Net Position] ) ), City[Population] ) RETURN IF ( [Years per City] <= 1, DIVIDE ( [Net Position], Pop ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Per Resident
+
+	/// Unrestricted Net Position per resident, over the cities in context that report it.
+	measure 'Unrestricted Net Position per Resident' = VAR Pop = SUMX ( FILTER ( City, NOT ISBLANK ( [Unrestricted Net Position] ) ), City[Population] ) RETURN IF ( [Years per City] <= 1, DIVIDE ( [Unrestricted Net Position], Pop ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Per Resident
+
+	/// Net Pension Liability per resident, over the cities in context that report it (19 city-years have it).
+	measure 'Net Pension Liability per Resident' = VAR Pop = SUMX ( FILTER ( City, NOT ISBLANK ( [Net Pension Liability] ) ), City[Population] ) RETURN IF ( [Years per City] <= 1, DIVIDE ( [Net Pension Liability], Pop ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Per Resident
+
+	/// Total Revenues in the fiscal year before the one in context (the report's comparative column). Blank unless one fiscal year is in context.
+	measure 'Total Revenues Prior Year' = VAR FY = MAX ( 'Fiscal Year End'[Year] ) RETURN IF ( HASONEVALUE ( 'Fiscal Year End'[Year] ), CALCULATE ( [Total Revenues], REMOVEFILTERS ( 'Fiscal Year End' ), REMOVEFILTERS ( 'Year Position' ), REMOVEFILTERS ( Report ), 'Fiscal Year End'[Year] = FY - 1 ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Change in Total Revenues over the prior fiscal year (Los Angeles FY2025 +11.1%).
+	measure 'Revenue Growth %' = DIVIDE ( [Total Revenues] - [Total Revenues Prior Year], [Total Revenues Prior Year] )
+		formatString: 0.0%
+		displayFolder: Time
+
+	/// Total Expenses in the fiscal year before the one in context.
+	measure 'Total Expenses Prior Year' = VAR FY = MAX ( 'Fiscal Year End'[Year] ) RETURN IF ( HASONEVALUE ( 'Fiscal Year End'[Year] ), CALCULATE ( [Total Expenses], REMOVEFILTERS ( 'Fiscal Year End' ), REMOVEFILTERS ( 'Year Position' ), REMOVEFILTERS ( Report ), 'Fiscal Year End'[Year] = FY - 1 ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Change in Total Expenses over the prior fiscal year.
+	measure 'Expense Growth %' = DIVIDE ( [Total Expenses] - [Total Expenses Prior Year], [Total Expenses Prior Year] )
+		formatString: 0.0%
+		displayFolder: Time
+
+	/// Figure rows in context.
+	measure 'Figures Read' = COUNTROWS ( 'Fact Figure' )
+		formatString: #,0
+		displayFolder: Coverage
+
+	/// Cities with at least one figure in context.
+	measure 'Cities Reporting' = DISTINCTCOUNT ( 'Fact Figure'[City Key] )
+		formatString: #,0
+		displayFolder: Coverage
+
+	/// Figures a person (or Claude) read on the cited PDF page and found right (30, across three runs; 29 of 30 right first time on rows still in the data). Every other figure is unchecked.
+	measure 'Hand-Checked Figures' = SUM ( 'Fact Figure'[Hand Checked] )
+		formatString: #,0
+		displayFolder: Coverage
+
+	/// Cities in context whose extracted lines pass every sum check (46 of 54).
+	measure 'Cities with Sums OK' = CALCULATE ( [Cities Reporting], KEEPFILTERS ( City[Table Sums OK] = TRUE () ) )
+		formatString: #,0
+		displayFolder: Coverage
+
+	/// Cities in context whose Unrestricted Net Position is below zero (34 of 54 on their latest report).
+	measure 'Cities with Negative Unrestricted Net Position' = COUNTROWS ( FILTER ( VALUES ( City[City Key] ), [Unrestricted Net Position] < 0 ) )
+		formatString: #,0
+		displayFolder: Coverage
+
+	/// Attribution for reports built from this model.
+	measure Attribution = "Read by our data factory from each city's audited Annual Comprehensive Financial Report (ACFR); every figure cites its PDF and page. Population: Census Bureau Vintage 2024."
+		formatString: @
+		displayFolder: About
+
+	/// slug|fiscal year|figure id (plus |source label for *_other rows); unique.
+	column 'Row ID'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Row ID
+
+	/// Census FIPS place code, related to City.
+	column 'City Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: City Key
+
+	/// Last day of the fiscal year, related to Fiscal Year End.
+	column 'Fiscal Year End'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Fiscal Year End
+
+	/// Latest or Prior, related to Year Position.
+	column 'Year Position'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Year Position
+
+	/// Figure id, related to Figure.
+	column 'Figure ID'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Figure ID
+
+	/// City and fiscal year, related to Report.
+	column 'Report Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Report Key
+
+	/// The row's own label in the ACFR (several summed: joined with +).
+	column 'Source Label'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Source Label
+
+	/// Value in US dollars (the factory's USD millions x 1,000,000).
+	column 'Value USD'
+		isAvailableInMdx: false
+		dataType: decimal
+		formatString: \$#,0;(\$#,0);\$#,0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Value USD
+
+	/// PDF page number (1-based page of the file, not the printed folio) the value was read from.
+	column Page
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Page
+
+	/// How the extractor found the value (condensed-changes-in-net-position, statement-column-match, ...; /prior-year-column, /unit-inferred-thousands suffixes).
+	column 'Extraction Method'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Extraction Method
+
+	/// 1 when the row was read against the PDF page and passed.
+	column 'Hand Checked'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Hand Checked
+
+	partition 'Fact Figure' = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(FinanceFiles{[Name = "figures.parquet"]}[Content]),
+					Kept = Table.SelectColumns(Raw, {"row_id", "city_key", "fiscal_year_end", "year_position", "figure_id", "report_key", "source_label", "value_usd", "page", "extraction_method", "hand_checked"}),
+					Renamed = Table.RenameColumns(Kept, {{"row_id", "Row ID"}, {"city_key", "City Key"}, {"fiscal_year_end", "Fiscal Year End"}, {"year_position", "Year Position"}, {"figure_id", "Figure ID"}, {"report_key", "Report Key"}, {"source_label", "Source Label"}, {"value_usd", "Value USD"}, {"page", "Page"}, {"extraction_method", "Extraction Method"}, {"hand_checked", "Hand Checked"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Row ID", type text}, {"City Key", type text}, {"Fiscal Year End", type date}, {"Year Position", type text}, {"Figure ID", type text}, {"Report Key", type text}, {"Source Label", type text}, {"Value USD", Currency.Type}, {"Page", Int64.Type}, {"Extraction Method", type text}, {"Hand Checked", Int64.Type}})
+				in
+					Typed

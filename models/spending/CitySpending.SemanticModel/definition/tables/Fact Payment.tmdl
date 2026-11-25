@@ -1,0 +1,162 @@
+/// Fact table: one row per payment line as each city publishes it (a voucher, check line or invoice distribution line), nine cities, latest two complete fiscal years (Dallas one): 4,049,310 lines, $105.2 billion. Amounts in US dollars; negative means a reversal, refund or void, and totals reproduce each city's portal totals to the cent, so identical lines are kept (they are real split lines). Every column is hidden; analysis goes through the measures and the dimensions.
+table 'Fact Payment'
+
+	/// Net dollars paid out in context, reversals included. A checkbook is cash to outside payees: no payroll, but capital outlay, debt principal and pass-throughs to pension funds, health plans and other governments are in. Use it for who gets paid, not what a function costs.
+	measure Spending = SUM ( 'Fact Payment'[Amount] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Spending
+
+	/// Payment lines in context. Grain differs by city (Atlanta and Austin repeat identical accounting lines; Chicago 2024 has year-only aggregates), so compare dollars, not line counts.
+	measure 'Payment Lines' = COUNTROWS ( 'Fact Payment' )
+		formatString: #,0
+		displayFolder: Spending
+
+	/// Sum of negative lines (reversals, refunds, voids). Kansas City about -$180M a year; Atlanta FY2026 -$276M of reversal pairs.
+	measure Reversals = CALCULATE ( [Spending], KEEPFILTERS ( 'Fact Payment'[Amount] < 0 ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Spending
+
+	/// Share of absolute dollars the crosswalk could not place in a function (Chicago 19-23%, others under 5%).
+	measure 'Unmapped Share' = DIVIDE ( COALESCE ( CALCULATE ( SUMX ( 'Fact Payment', ABS ( 'Fact Payment'[Amount] ) ), KEEPFILTERS ( 'Function'[Function] = "unmapped" ) ), 0 ), SUMX ( 'Fact Payment', ABS ( 'Fact Payment'[Amount] ) ) )
+		formatString: 0.0%
+		displayFolder: Spending
+
+	/// Spending divided by the city's Census Vintage 2024 population; blank unless one city is in context. Not annualized: two fiscal years in context means a two-year figure.
+	measure 'Spending per Resident' = IF ( HASONEVALUE ( City[City] ), DIVIDE ( [Spending], MAX ( City[Population] ) ) )
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Spending
+
+	/// Spending to outside payees: leaves out the benefits, debt and non-departmental function and the pass-through payee list (Vendor[Pass-Through]). $60.7 billion across the nine cities. Other governments (LAHSA, LAUSD, KCATA, housing authorities) are still in, and about $368M of title companies, a health plan and federal agencies slip past the list.
+	measure 'Vendor Spending' = CALCULATE ( [Spending], KEEPFILTERS ( 'Fact Payment'[Vendor Spend] = 1 ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Vendors
+
+	/// Distinct normalized payees with vendor spending in context.
+	measure Payees = CALCULATE ( DISTINCTCOUNT ( 'Fact Payment'[Vendor Key] ), KEEPFILTERS ( 'Fact Payment'[Vendor Spend] = 1 ) )
+		formatString: #,0
+		displayFolder: Vendors
+
+	/// Share of Vendor Spending going to the ten largest payees in context. Read per city and fiscal year (Atlanta FY2026 41.2%, Los Angeles 21.2%).
+	measure 'Top 10 Payee Share' = VAR Top10 = TOPN ( 10, VALUES ( Vendor[Vendor Key] ), [Vendor Spending], DESC ) RETURN DIVIDE ( SUMX ( Top10, [Vendor Spending] ), [Vendor Spending] )
+		formatString: 0.0%
+		displayFolder: Vendors
+
+	/// Share of Vendor Spending going to the hundred largest payees in context (57-81% in every city).
+	measure 'Top 100 Payee Share' = VAR Top100 = TOPN ( 100, VALUES ( Vendor[Vendor Key] ), [Vendor Spending], DESC ) RETURN DIVIDE ( SUMX ( Top100, [Vendor Spending] ), [Vendor Spending] )
+		formatString: 0.0%
+		displayFolder: Vendors
+
+	/// Cities with vendor spending in context: with one payee in context, how many cities paid it.
+	measure 'Cities Paying' = CALCULATE ( DISTINCTCOUNT ( 'Fact Payment'[City] ), KEEPFILTERS ( 'Fact Payment'[Vendor Spend] = 1 ) )
+		formatString: #,0
+		displayFolder: Vendors
+
+	/// Payees paid by three or more of the nine cities over both years (Vendor[Cities Paid]): 938 in all, a count the join alone can make.
+	measure 'Multi-City Vendors' = CALCULATE ( [Payees], KEEPFILTERS ( Vendor[Cities Paid] >= 3 ) )
+		formatString: #,0
+		displayFolder: Vendors
+
+	/// Vendor Spending to payees paid by three or more cities ($6.5 billion, 10.7% of vendor spending).
+	measure 'Multi-City Vendor Spending' = CALCULATE ( [Vendor Spending], KEEPFILTERS ( Vendor[Cities Paid] >= 3 ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Vendors
+
+	/// Multi-City Vendor Spending over Vendor Spending.
+	measure 'Multi-City Vendor Share' = DIVIDE ( [Multi-City Vendor Spending], [Vendor Spending] )
+		formatString: 0.0%
+		displayFolder: Vendors
+
+	/// Spending in the fiscal year before the one in context; blank unless one fiscal year is in context. Cities end their years in different months, so compare a city with itself.
+	measure 'Spending Prior FY' = VAR FY = MAX ( 'Fiscal Year'[Fiscal Year] ) RETURN IF ( HASONEVALUE ( 'Fiscal Year'[Fiscal Year] ), CALCULATE ( [Spending], REMOVEFILTERS ( 'Fiscal Year' ), 'Fiscal Year'[Fiscal Year] = FY - 1 ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Change in Spending over the prior fiscal year. Blank where the prior year isn't loaded (Dallas, each city's first year).
+	measure 'Spending YoY %' = DIVIDE ( [Spending] - [Spending Prior FY], [Spending Prior FY] )
+		formatString: 0.0%
+		displayFolder: Time
+
+	/// Attribution for reports built from this model.
+	measure Attribution = "Payments joined from nine cities' open checkbook datasets (Chicago, Los Angeles, San Francisco, Austin, Dallas, Kansas City, Cincinnati, Atlanta, Boston) by our data factory. Population: Census Bureau Vintage 2024."
+		formatString: @
+		displayFolder: About
+
+	/// City slug, related to City.
+	column City
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Fiscal year (the year it ends in), related to Fiscal Year.
+	column 'Fiscal Year'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Fiscal Year
+
+	/// Check / payment date, related to Date. Blank for San Francisco and Chicago's 2024 year-only aggregates.
+	column 'Payment Date'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Payment Date
+
+	/// Amount in US dollars as published; negative is a reversal.
+	column Amount
+		isAvailableInMdx: false
+		dataType: decimal
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		isHidden
+		summarizeBy: none
+		sourceColumn: Amount
+
+	/// Normalized payee, related to Vendor (0 = no payee).
+	column 'Vendor Key'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Vendor Key
+
+	/// City and published department, related to Department.
+	column 'Department Key'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Department Key
+
+	/// Common function from the crosswalk, related to Function.
+	column Function
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Function
+
+	/// 1 when the line counts as vendor spending (not benefits, debt or non-departmental, has a payee, payee not on the pass-through list).
+	column 'Vendor Spend'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Vendor Spend
+
+	partition 'Fact Payment' = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(SpendingFiles{[Name = "payments.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"city", "City"}, {"fiscal_year", "Fiscal Year"}, {"payment_date", "Payment Date"}, {"amount", "Amount"}, {"vendor_key", "Vendor Key"}, {"department_key", "Department Key"}, {"function", "Function"}, {"vendor_spend", "Vendor Spend"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"City", type text}, {"Fiscal Year", Int64.Type}, {"Payment Date", type date}, {"Amount", Currency.Type}, {"Vendor Key", Int64.Type}, {"Department Key", Int64.Type}, {"Function", type text}, {"Vendor Spend", Int64.Type}})
+				in
+					Typed

@@ -1,0 +1,118 @@
+/// Fact table: one row per member per item with a roll call (votes.csv), absent members kept. A block roll call copies the same VoteIds onto every item in the block, so the counting measures use distinct Vote Key: one member's vote on one roll call. Topic, consent and meeting date are carried from the item so the dimensions filter votes directly. Every column is hidden.
+table 'Fact Vote'
+
+	/// Rows: member x item. Repeats a block roll call once per item; for votes cast use Member Votes.
+	measure 'Member Vote Rows' = COUNTROWS ( 'Fact Vote' )
+		formatString: #,0
+		displayFolder: Votes
+
+	/// Distinct member votes (VoteId): one per member per roll call.
+	measure 'Member Votes' = DISTINCTCOUNT ( 'Fact Vote'[Vote Key] )
+		formatString: #,0
+		displayFolder: Votes
+
+	/// No votes (Opposed, No, Nay), each VoteId once (Denver 242, Oakland 40).
+	measure 'No Votes' = CALCULATE ( [Member Votes], KEEPFILTERS ( 'Vote Value'[Vote Group] = "No" ) )
+		formatString: #,0
+		displayFolder: Dissent
+
+	/// Absent, excused or late-arrival entries on roll calls, each VoteId once.
+	measure Absences = CALCULATE ( [Member Votes], KEEPFILTERS ( 'Vote Value'[Vote Group] = "Absent" ) )
+		formatString: #,0
+		displayFolder: Votes
+
+	/// Members in context who cast at least one no vote.
+	measure 'Members with a No' = COUNTROWS ( FILTER ( VALUES ( 'Member'[Member Key] ), [No Votes] > 0 ) )
+		formatString: #,0
+		displayFolder: Dissent
+
+	/// No votes cast by the member in context with the most.
+	measure 'Top Dissenter No Votes' = MAXX ( VALUES ( 'Member'[Member Key] ), [No Votes] )
+		formatString: #,0
+		displayFolder: Dissent
+
+	/// Share of the no votes in context cast by one member (Oakland: Carroll Fife 42.5%). Read per city.
+	measure 'Top Dissenter Share' = DIVIDE ( [Top Dissenter No Votes], [No Votes] )
+		formatString: 0.0%
+		displayFolder: Dissent
+
+	/// Name of the member with the most no votes in context (ties: first by name).
+	measure 'Top Dissenter' = IF ( [No Votes] > 0, MAXX ( TOPN ( 1, VALUES ( 'Member'[Member] ), [No Votes], DESC, 'Member'[Member], ASC ), 'Member'[Member] ) )
+		formatString: @
+		displayFolder: Dissent
+
+	/// City and Legistar VoteId: one member on one roll call.
+	column 'Vote Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Vote Key
+
+	/// City and EventItemId of the item voted on (descriptive; items relate through the shared dimensions).
+	column 'Item Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Item Key
+
+	/// City and person id, related to Member.
+	column 'Member Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Member Key
+
+	/// Legistar client, related to City.
+	column City
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Meeting date, related to Date.
+	column 'Meeting Date'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Meeting Date
+
+	/// The item's topic, related to Topic.
+	column Topic
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Topic
+
+	/// The item's consent flag.
+	column Consent
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Consent
+
+	/// Vote value as published, related to Vote Value.
+	column 'Vote Value'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Vote Value
+
+	partition 'Fact Vote' = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(CouncilFiles{[Name = "votes.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"vote_key", "Vote Key"}, {"item_key", "Item Key"}, {"member_key", "Member Key"}, {"city", "City"}, {"meeting_date", "Meeting Date"}, {"topic", "Topic"}, {"consent", "Consent"}, {"vote_value", "Vote Value"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Vote Key", type text}, {"Item Key", type text}, {"Member Key", type text}, {"City", type text}, {"Meeting Date", type date}, {"Topic", type text}, {"Consent", Int64.Type}, {"Vote Value", type text}})
+				in
+					Typed

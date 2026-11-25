@@ -1,0 +1,26 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+	annotation __PBI_TimeIntelligenceEnabled = 0
+
+	annotation Attribution = Payments joined from nine cities' open checkbook datasets (Chicago, Los Angeles, San Francisco, Austin, Dallas, Kansas City, Cincinnati, Atlanta, Boston) by our data factory. Population: Census Bureau Vintage 2024.
+
+	annotation PBI_QueryOrder = ["SpendingFolder","SpendingFiles","Calendar","Fact Payment","City","Fiscal Year","Vendor","Department","Function","Date"]
+
+ref table 'Fact Payment'
+ref table City
+ref table 'Fiscal Year'
+ref table Vendor
+ref table Department
+ref table Function
+ref table Date
+
+ref expression SpendingFolder
+ref expression SpendingFiles
+ref expression Calendar
