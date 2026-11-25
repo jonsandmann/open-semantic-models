@@ -313,7 +313,7 @@ datasets:
   metrics:
   - name: permits
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: Permits in context, every category and jurisdiction. A permit is not the same unit everywhere (NYC
       issues one work permit per trade per job; Seattle's file holds no trades), so compare categories.
@@ -376,7 +376,7 @@ datasets:
         display_folder: Speed
   - name: same_day_issue_share
     expression:
-      sql: COALESCE(COUNT(*) FILTER (WHERE days_apply_to_issue = 0), 0) / NULLIF(COUNT(*) FILTER (WHERE days_apply_to_issue
+      sql: COUNT(*) FILTER (WHERE COALESCE(days_apply_to_issue, 0) = 0) / NULLIF(COUNT(*) FILTER (WHERE days_apply_to_issue
         IS NOT NULL), 0)
     datatype: Decimal
     description: Share of permits in context issued the same day they were filed (Days Apply To Issue = 0).
@@ -400,6 +400,17 @@ datasets:
         dax: SUM ( 'Fact Permit'[Valuation Usable] )
         format_string: $#,0;($#,0);$#,0
         display_folder: Value
+  - name: new_construction_valuation
+    expression:
+      sql: SUM(valuation_usable) FILTER (WHERE category_key IN ('new_residential', 'new_nonresidential'))
+    datatype: Decimal
+    description: 'New-construction declared value: Valuation USD on new residential and new non-residential only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Valuation USD], KEEPFILTERS ( Category[Work Class] = "new" ) )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Value
   - name: last_issue_date
     expression:
       sql: MAX(issued_date)
@@ -414,7 +425,7 @@ datasets:
         is_hidden: true
   - name: applications
     expression:
-      sql: COUNT(*) FILTER (WHERE applied_date IS NOT NULL)
+      sql: NULLIF(COUNT(*) FILTER (WHERE applied_date IS NOT NULL), 0)
     datatype: Decimal
     description: Permits that have an application date in context (Apply Date). Boston and Philadelphia publish
       issued permits only.
@@ -426,7 +437,7 @@ datasets:
         display_folder: Pipeline
   - name: finaled_permits
     expression:
-      sql: COUNT(*) FILTER (WHERE final_date IS NOT NULL)
+      sql: NULLIF(COUNT(*) FILTER (WHERE final_date IS NOT NULL), 0)
     datatype: Decimal
     description: Permits that have a final / certificate date in context (Final Date). Recent years are incomplete
       by construction.
@@ -850,20 +861,6 @@ metrics:
     data:
       format_string: '0.00'
       display_folder: Housing
-- name: new_construction_valuation
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: CALCULATE ( [Valuation USD], KEEPFILTERS ( Category[Work Class] = "new" ) )
-  datatype: Decimal
-  description: 'New-construction declared value: Valuation USD on new residential and new non-residential only.
-    No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may only reference the aggregate''s own dataset, and the
-    fact has no copy of that column.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: $#,0;($#,0);$#,0
-      display_folder: Value
 - name: permits_prior_year
   expression:
     dialects:

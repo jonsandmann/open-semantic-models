@@ -513,7 +513,7 @@ datasets:
   metrics:
   - name: events
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: 'Storm events (event ids) in the filter context. One row per event: a county or zone segment of
       a storm, not the storm system.'
@@ -525,7 +525,7 @@ datasets:
         display_folder: Volume
   - name: episodes
     expression:
-      sql: COUNT(DISTINCT episode_id)
+      sql: NULLIF(COUNT(DISTINCT episode_id), 0)
     datatype: Integer
     description: Storm systems (distinct episode ids) in the filter context. An episode spans several events; this
       is not a sum of events.
@@ -537,7 +537,7 @@ datasets:
         display_folder: Volume
   - name: states_in_scope
     expression:
-      sql: COUNT(DISTINCT state)
+      sql: NULLIF(COUNT(DISTINCT state), 0)
     datatype: Integer
     description: States, territories and marine areas with at least one event in the filter context.
     nonportable_extensions:
@@ -583,7 +583,7 @@ datasets:
         display_folder: Loss
   - name: events_with_property_damage
     expression:
-      sql: COUNT(*) FILTER (WHERE property_damage_usd > 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE property_damage_usd > 0), 0)
     datatype: Decimal
     description: Events with a property damage figure above zero.
     nonportable_extensions:
@@ -653,7 +653,7 @@ datasets:
         display_folder: Deaths
   - name: events_with_a_death
     expression:
-      sql: COUNT(*) FILTER (WHERE COALESCE(deaths_direct, 0) + COALESCE(deaths_indirect, 0) > 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE COALESCE(deaths_direct, 0) + COALESCE(deaths_indirect, 0) > 0), 0)
     datatype: Integer
     description: Events with at least one direct or indirect death on the row.
     nonportable_extensions:
@@ -665,7 +665,7 @@ datasets:
         display_folder: Deaths
   - name: tornadoes
     expression:
-      sql: COUNT(*) FILTER (WHERE event_type = 'Tornado')
+      sql: NULLIF(COUNT(*) FILTER (WHERE event_type = 'Tornado'), 0)
     datatype: Decimal
     description: Tornado events in the filter context. Keeps any event type filter, so a Hail row shows blank and
       a Tornado row its count.
@@ -673,6 +673,19 @@ datasets:
     - vendor_name: power_bi
       data:
         dax: CALCULATE ( [Events], KEEPFILTERS ( 'Event Type'[Event Type] = "Tornado" ) )
+        format_string: '#,0'
+        display_folder: Tornado
+  - name: ef2_or_stronger
+    expression:
+      sql: NULLIF(COUNT(*) FILTER (WHERE event_type = 'Tornado' AND tornado_scale IN ('EF2', 'EF3', 'EF4', 'EF5',
+        'F2', 'F3', 'F4', 'F5')), 0)
+    datatype: Integer
+    description: Tornadoes rated EF2 or stronger (or F2 and up in older years). EFU, an unrated tornado, is not
+      counted.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Tornadoes], KEEPFILTERS ( 'Tornado Scale'[Scale Number] >= 2 ) )
         format_string: '#,0'
         display_folder: Tornado
   - name: tornado_path_miles
@@ -690,7 +703,7 @@ datasets:
         display_folder: Tornado
   - name: blank_property_cells
     expression:
-      sql: COUNT(*) FILTER (WHERE property_damage_usd IS NULL)
+      sql: NULLIF(COUNT(*) FILTER (WHERE property_damage_usd IS NULL), 0)
     datatype: Decimal
     description: Event rows whose property damage cell is blank (unknown, kept out of the sums, not counted as zero).
     nonportable_extensions:
@@ -760,13 +773,35 @@ datasets:
   metrics:
   - name: fatality_records
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: People in the fatalities file. Read apart from Deaths (the event rows' counts); never add the two.
     nonportable_extensions:
     - vendor_name: power_bi
       data:
         dax: COUNTROWS ( 'Fact Fatality' )
+        format_string: '#,0'
+        display_folder: Fatality file
+  - name: direct_fatality_records
+    expression:
+      sql: NULLIF(COUNT(*) FILTER (WHERE profile_key LIKE 'Direct|%'), 0)
+    datatype: Integer
+    description: Fatality records whose type is Direct.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Direct" ) )
+        format_string: '#,0'
+        display_folder: Fatality file
+  - name: indirect_fatality_records
+    expression:
+      sql: NULLIF(COUNT(*) FILTER (WHERE profile_key LIKE 'Indirect|%'), 0)
+    datatype: Integer
+    description: Fatality records whose type is Indirect.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Indirect" ) )
         format_string: '#,0'
         display_folder: Fatality file
   - name: median_age_at_death
@@ -1084,20 +1119,6 @@ relationships:
   to_columns:
   - profile_key
 metrics:
-- name: ef2_or_stronger
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: CALCULATE ( [Tornadoes], KEEPFILTERS ( 'Tornado Scale'[Scale Number] >= 2 ) )
-  datatype: Decimal
-  description: 'Tornadoes rated EF2 or stronger (or F2 and up in older years). EFU, an unrated tornado, is not counted.
-    No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may only reference the aggregate''s own dataset, and the
-    fact has no copy of that column.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: '#,0'
-      display_folder: Tornado
 - name: average_magnitude
   expression:
     dialects:
@@ -1247,30 +1268,3 @@ metrics:
     data:
       format_string: '@'
       display_folder: About
-- name: direct_fatality_records
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Direct" ) )
-  datatype: Decimal
-  description: 'Fatality records whose type is Direct. No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may only
-    reference the aggregate''s own dataset, and the fact has no copy of that column.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: '#,0'
-      display_folder: Fatality file
-- name: indirect_fatality_records
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Indirect" )
-        )
-  datatype: Decimal
-  description: 'Fatality records whose type is Indirect. No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may
-    only reference the aggregate''s own dataset, and the fact has no copy of that column.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: '#,0'
-      display_folder: Fatality file

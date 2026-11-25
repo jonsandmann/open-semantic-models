@@ -43,25 +43,25 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 
 ## Measures
 
-**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. One difference holds for every ported count: on an empty group DAX returns blank and SQL `COUNT` returns 0.
+**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. Two DAX blank rules are written into the SQL: a count of no rows is blank in DAX and 0 in SQL, so every count measure is `NULLIF(COUNT(...), 0)` (including a count whose filter matches nothing in a non-empty group); and DAX compares a blank as 0, so a filter that 0 passes (`= 0`, `< 250000`) is written on `COALESCE(column, 0)`.
 
 | Measure | Verdict | Ossie SQL, or why not |
 | --- | --- | --- |
-| Events | Ports as SQL | `COUNT(*)` |
-| Episodes | Ports as SQL | `COUNT(DISTINCT episode_id)` |
-| States in scope | Ports as SQL | `COUNT(DISTINCT state)` |
+| Events | Ports as SQL | `NULLIF(COUNT(*), 0)` |
+| Episodes | Ports as SQL | `NULLIF(COUNT(DISTINCT episode_id), 0)` |
+| States in scope | Ports as SQL | `NULLIF(COUNT(DISTINCT state), 0)` |
 | Property damage | Ports as SQL | `SUM(property_damage_usd)` |
 | Crop damage | Ports as SQL | `SUM(crop_damage_usd)` |
 | Total damage | Ports as SQL | `SUM(COALESCE(property_damage_usd, 0) + COALESCE(crop_damage_usd, 0))`. The SUMX row iterator becomes a SUM over a row expression; same result. |
-| Events with property damage | Ports as SQL | `COUNT(*) FILTER (WHERE property_damage_usd > 0)` |
+| Events with property damage | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE property_damage_usd > 0), 0)` |
 | Damage per event | Ports as SQL | `SUM(COALESCE(property_damage_usd, 0) + COALESCE(crop_damage_usd, 0)) / NULLIF(COUNT(*), 0)` |
 | Deaths | Ports as SQL | `SUM(COALESCE(deaths_direct, 0) + COALESCE(deaths_indirect, 0))`. The SUMX row iterator becomes a SUM over a row expression; same result. |
 | Direct deaths | Ports as SQL | `SUM(deaths_direct)` |
 | Indirect deaths | Ports as SQL | `SUM(deaths_indirect)` |
 | Injuries | Ports as SQL | `SUM(COALESCE(injuries_direct, 0) + COALESCE(injuries_indirect, 0))`. The SUMX row iterator becomes a SUM over a row expression; same result. |
-| Events with a death | Ports as SQL | `COUNT(*) FILTER (WHERE COALESCE(deaths_direct, 0) + COALESCE(deaths_indirect, 0) > 0)` |
-| Tornadoes | Ports as SQL | `COUNT(*) FILTER (WHERE event_type = 'Tornado')` |
-| EF2 or stronger | Doesn't port | *filter on a dimension attribute*: `FILTER (WHERE ...)` may only reference the aggregate's own dataset, and the fact has no copy of that column. |
+| Events with a death | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE COALESCE(deaths_direct, 0) + COALESCE(deaths_indirect, 0) > 0), 0)` |
+| Tornadoes | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE event_type = 'Tornado'), 0)` |
+| EF2 or stronger | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE event_type = 'Tornado' AND tornado_scale IN ('EF2', 'EF3', 'EF4', 'EF5', 'F2', 'F3', 'F4', 'F5')), 0)`. `Tornado Scale[Scale Number]` is the digits of the fact's own `tornado_scale` (the dimension's M), and NOAA's ratings are EF0 to EF5, F0 to F5 and EFU, so `Scale Number >= 2` is this list. |
 | Tornado path miles | Ports as SQL | `SUM(tornado_length_miles) FILTER (WHERE event_type = 'Tornado')` |
 | Average magnitude | Doesn't port | *needs filter context*: blank unless exactly one event type is in the filters (magnitude is knots for wind and inches for hail). `AVG(magnitude)` alone would mix units; the guard reads the query's filters. |
 | Events YTD | Doesn't port | *time intelligence*: `TOTALYTD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |
@@ -71,17 +71,17 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 | Property damage prior year | Doesn't port | *time intelligence*: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |
 | Property damage YoY % | Doesn't port | *time intelligence*: Depends on `property_damage_prior_year`, which doesn't port. |
 | Last Begin Date | Doesn't port | *needs filter context*: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
-| Blank property cells | Ports as SQL | `COUNT(*) FILTER (WHERE property_damage_usd IS NULL)` |
+| Blank property cells | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE property_damage_usd IS NULL), 0)` |
 | File vintage | Doesn't port | *needs filter context*: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 | Citation | Doesn't port | *text, not a number*: a citation or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate. |
-| Fatality records | Ports as SQL | `COUNT(*)` |
-| Direct fatality records | Doesn't port | *filter on a dimension attribute*: `FILTER (WHERE ...)` may only reference the aggregate's own dataset, and the fact has no copy of that column. |
-| Indirect fatality records | Doesn't port | *filter on a dimension attribute*: `FILTER (WHERE ...)` may only reference the aggregate's own dataset, and the fact has no copy of that column. |
+| Fatality records | Ports as SQL | `NULLIF(COUNT(*), 0)` |
+| Direct fatality records | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE profile_key LIKE 'Direct\|%'), 0)`. The fact's `profile_key` is `Fatality Type \| Location \| Sex` and the type is only Direct, Indirect or Unknown, so its first segment is the dimension's Fatality Type. |
+| Indirect fatality records | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE profile_key LIKE 'Indirect\|%'), 0)`. The fact's `profile_key` is `Fatality Type \| Location \| Sex` and the type is only Direct, Indirect or Unknown, so its first segment is the dimension's Fatality Type. |
 | Median age at death | Ports as SQL | `MEDIAN(age)` |
 
-**Count:** 31 measures. 18 port as SQL, 0 port with changes, 13 don't port (18 of 31 ported).
+**Count:** 31 measures. 21 port as SQL, 0 port with changes, 10 don't port (21 of 31 ported).
 
-Why the rest don't port: time intelligence (6); filter on a dimension attribute (3); needs filter context (3); text, not a number (1).
+Why the rest don't port: time intelligence (6); needs filter context (3); text, not a number (1).
 
 ## What was validated
 

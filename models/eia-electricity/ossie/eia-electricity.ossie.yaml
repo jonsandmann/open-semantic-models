@@ -271,9 +271,51 @@ datasets:
         dax: DIVIDE ( [Revenue], [Sales kWh] ) * 100
         format_string: '0.00'
         display_folder: Price
+  - name: average_customers
+    expression:
+      sql: SUM(customer_count) / NULLIF(COUNT(DISTINCT date) FILTER (WHERE customer_count IS NOT NULL), 0)
+    datatype: Decimal
+    description: 'Customer accounts averaged over the months with data in the filter context: each month''s accounts
+      (added across states and sectors) averaged across months. Equals Customers for one month. The denominator
+      of the per-customer measures, so a year divides by its average customer base, not December''s.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: AVERAGEX ( VALUES ( 'Fact Retail Sales'[Date] ), CALCULATE ( SUM ( 'Fact Retail Sales'[Customer Count]
+          ) ) )
+        format_string: '#,0'
+        display_folder: Sales
+  - name: revenue_per_customer
+    expression:
+      sql: SUM(revenue_amount_usd) * COUNT(DISTINCT date) FILTER (WHERE customer_count IS NOT NULL) / NULLIF(SUM(customer_count),
+        0)
+    datatype: Decimal
+    description: 'Revenue per customer account: revenue in the filter context divided by Average customers. For
+      one month it is the average monthly bill; for a whole year, the average annual bill; for a year in progress,
+      the bill so far (Months in scope says how many months).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Revenue], [Average customers] )
+        format_string: $#,0.00;($#,0.00);$#,0.00
+        display_folder: Price
+  - name: sales_per_customer_kwh
+    expression:
+      sql: SUM(sales_amount_kwh) * COUNT(DISTINCT date) FILTER (WHERE customer_count IS NOT NULL) / NULLIF(SUM(customer_count),
+        0)
+    datatype: Decimal
+    description: 'Kilowatthours sold per customer account: sales in the filter context divided by Average customers.
+      For one month it is average monthly use; for a whole year, annual use; for a year in progress, use so far
+      (Months in scope says how many months).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Sales kWh], [Average customers] )
+        format_string: '#,0.0'
+        display_folder: Price
   - name: months_in_scope
     expression:
-      sql: COUNT(DISTINCT date)
+      sql: NULLIF(COUNT(DISTINCT date), 0)
     datatype: Integer
     description: 'Number of distinct months with data in the current filter context. A completeness check: a full
       year has 12.'
@@ -285,7 +327,7 @@ datasets:
         display_folder: Audit
   - name: preliminary_months
     expression:
-      sql: COUNT(DISTINCT date) FILTER (WHERE data_status = 'Preliminary')
+      sql: NULLIF(COUNT(DISTINCT date) FILTER (WHERE data_status = 'Preliminary'), 0)
     datatype: Decimal
     description: Months in the current filter context that EIA still marks Preliminary (estimates revised when the
       annual EIA-861 survey is final).
@@ -394,53 +436,6 @@ metrics:
     data:
       format_string: '#,0'
       display_folder: Sales
-- name: average_customers
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: AVERAGEX ( VALUES ( 'Fact Retail Sales'[Date] ), CALCULATE ( SUM ( 'Fact Retail Sales'[Customer
-        Count] ) ) )
-  datatype: Decimal
-  description: 'Customer accounts averaged over the months with data in the filter context: each month''s accounts
-    (added across states and sectors) averaged across months. Equals Customers for one month. The denominator of
-    the per-customer measures, so a year divides by its average customer base, not December''s. No OSSIE_SQL_2026
-    expression: sum within each month, then average across months. Two-level aggregation, not one aggregate over
-    the row grain.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: '#,0'
-      display_folder: Sales
-- name: revenue_per_customer
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: DIVIDE ( [Revenue], [Average customers] )
-  datatype: Decimal
-  description: 'Revenue per customer account: revenue in the filter context divided by Average customers. For one
-    month it is the average monthly bill; for a whole year, the average annual bill; for a year in progress, the
-    bill so far (Months in scope says how many months). No OSSIE_SQL_2026 expression: Depends on `average_customers`,
-    which doesn''t port.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: $#,0.00;($#,0.00);$#,0.00
-      display_folder: Price
-- name: sales_per_customer_kwh
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: DIVIDE ( [Sales kWh], [Average customers] )
-  datatype: Decimal
-  description: 'Kilowatthours sold per customer account: sales in the filter context divided by Average customers.
-    For one month it is average monthly use; for a whole year, annual use; for a year in progress, use so far (Months
-    in scope says how many months). No OSSIE_SQL_2026 expression: Depends on `average_customers`, which doesn''t
-    port.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: '#,0.0'
-      display_folder: Price
 - name: share_of_us_sales
   expression:
     dialects:

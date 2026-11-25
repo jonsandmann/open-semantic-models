@@ -482,7 +482,7 @@ datasets:
   metrics:
   - name: inspections
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: Inspections in context, every jurisdiction and type. Austin's count includes score-only inspections
       with no violation data.
@@ -492,9 +492,22 @@ datasets:
         dax: COUNTROWS ( 'Fact Inspection' )
         format_string: '#,0'
         display_folder: Inspections
+  - name: inspections_with_violation_data
+    expression:
+      sql: NULLIF(COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware',
+        'marin', 'ny_state', 'boston', 'toronto')), 0)
+    datatype: Integer
+    description: 'Inspections in jurisdictions that publish violations (all but Austin): the denominator of every
+      per-inspection violation measure, so Austin''s score-only inspections never dilute a rate.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Inspections], KEEPFILTERS ( Jurisdiction[Publishes Violations] = TRUE () ) )
+        format_string: '#,0'
+        display_folder: Inspections
   - name: establishments_inspected
     expression:
-      sql: COUNT(DISTINCT establishment_key)
+      sql: NULLIF(COUNT(DISTINCT establishment_key), 0)
     datatype: Integer
     description: Distinct establishments with an inspection in context.
     nonportable_extensions:
@@ -505,7 +518,7 @@ datasets:
         display_folder: Inspections
   - name: inspections_per_establishment
     expression:
-      sql: COUNT(*) / NULLIF(COUNT(DISTINCT establishment_key), 0)
+      sql: NULLIF(COUNT(*), 0) / NULLIF(COUNT(DISTINCT establishment_key), 0)
     datatype: Decimal
     description: Inspections per establishment inspected in context.
     nonportable_extensions:
@@ -516,7 +529,7 @@ datasets:
         display_folder: Inspections
   - name: follow_up_share
     expression:
-      sql: COALESCE(COUNT(*) FILTER (WHERE visit_kind_key = 2), 0) / NULLIF(COUNT(*), 0)
+      sql: COUNT(*) FILTER (WHERE visit_kind_key = 2) / NULLIF(COUNT(*), 0)
     datatype: Decimal
     description: Share of inspections in context that came within 60 days of an earlier visit to the same establishment
       (Visit Kind). High in Boston, whose follow-ups are published as routine visits.
@@ -527,6 +540,23 @@ datasets:
           0 ), [Inspections] )
         format_string: 0.0%
         display_folder: Inspections
+  - name: share_with_no_violation
+    expression:
+      sql: COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware',
+        'marin', 'ny_state', 'boston', 'toronto') AND COALESCE(violation_count, 0) = 0) / NULLIF(COUNT(*) FILTER
+        (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state',
+        'boston', 'toronto')), 0)
+    datatype: Decimal
+    description: 'Share of inspections with violation data that cited no violation at all. Recording habits differ:
+      a jurisdiction that lists only failing visits'' violations (Boston) looks cleaner or dirtier for reasons of
+      publishing, not kitchens.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( COALESCE ( CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Fact Inspection'[Violation
+          Count] = 0 ) ), 0 ), [Inspections with violation data] )
+        format_string: 0.0%
+        display_folder: Findings
   - name: average_burden_score
     expression:
       sql: AVG(burden_score)
@@ -540,6 +570,34 @@ datasets:
       data:
         dax: AVERAGE ( 'Fact Inspection'[Burden Score] )
         format_string: '0.0'
+        display_folder: Findings
+  - name: inspections_with_3_plus_criticals
+    expression:
+      sql: NULLIF(COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware',
+        'marin', 'ny_state', 'boston', 'toronto') AND critical_band_key = 3), 0)
+    datatype: Integer
+    description: Inspections with violation data that cited three or more critical violations (each jurisdiction's
+      own critical flag).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Critical Band'[Critical Band Key] = 3
+          ) )
+        format_string: '#,0'
+        display_folder: Findings
+  - name: share_with_3_plus_criticals
+    expression:
+      sql: COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware',
+        'marin', 'ny_state', 'boston', 'toronto') AND critical_band_key = 3) / NULLIF(COUNT(*) FILTER (WHERE jurisdiction_key
+        IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state', 'boston', 'toronto')),
+        0)
+    datatype: Decimal
+    description: Share of inspections with violation data that cited three or more critical violations.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( COALESCE ( [Inspections with 3+ criticals], 0 ), [Inspections with violation data] )
+        format_string: 0.0%
         display_folder: Findings
 - name: fact_violation
   source: restaurant_inspections.fact_violation
@@ -608,7 +666,7 @@ datasets:
   metrics:
   - name: violations
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: Violation rows in context. Recording habits differ (NYC cites a code once per inspection; King
       County and Toronto can cite one problem as several rows), so compare jurisdictions per inspection, not on
@@ -621,7 +679,7 @@ datasets:
         display_folder: Findings
   - name: critical_violations
     expression:
-      sql: COUNT(*) FILTER (WHERE critical_flag = 'Critical')
+      sql: NULLIF(COUNT(*) FILTER (WHERE critical_flag = 'Critical'), 0)
     datatype: Decimal
     description: 'Critical violations in context, each jurisdiction''s own critical flag (derived from the category
       in Delaware and Montgomery). Respects a Critical Flag filter: with Not critical picked it is blank.'
@@ -633,7 +691,7 @@ datasets:
         display_folder: Findings
   - name: critical_share_of_violations
     expression:
-      sql: COUNT(*) FILTER (WHERE critical_flag = 'Critical') / NULLIF(COUNT(*), 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE critical_flag = 'Critical'), 0) / NULLIF(COUNT(*), 0)
     datatype: Decimal
     description: Critical violations as a share of all violations in context.
     nonportable_extensions:
@@ -644,7 +702,7 @@ datasets:
         display_folder: Findings
   - name: inspections_citing
     expression:
-      sql: COUNT(DISTINCT inspection_key)
+      sql: NULLIF(COUNT(DISTINCT inspection_key), 0)
     datatype: Integer
     description: 'Inspections that cited at least one violation in context: pick a Violation Category to count inspections
       citing it. Counted once per inspection, however many rows it cited.'
@@ -1028,65 +1086,6 @@ relationships:
   to_columns:
   - violation_code_key
 metrics:
-- name: inspections_with_violation_data
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: CALCULATE ( [Inspections], KEEPFILTERS ( Jurisdiction[Publishes Violations] = TRUE () ) )
-  datatype: Decimal
-  description: 'Inspections in jurisdictions that publish violations (all but Austin): the denominator of every
-    per-inspection violation measure, so Austin''s score-only inspections never dilute a rate. No OSSIE_SQL_2026
-    expression: `FILTER (WHERE ...)` may only reference the aggregate''s own dataset, and the fact has no copy of
-    that column.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: '#,0'
-      display_folder: Inspections
-- name: share_with_no_violation
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: DIVIDE ( COALESCE ( CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Fact Inspection'[Violation
-        Count] = 0 ) ), 0 ), [Inspections with violation data] )
-  datatype: Decimal
-  description: 'Share of inspections with violation data that cited no violation at all. Recording habits differ:
-    a jurisdiction that lists only failing visits'' violations (Boston) looks cleaner or dirtier for reasons of
-    publishing, not kitchens. No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which
-    doesn''t port.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: 0.0%
-      display_folder: Findings
-- name: inspections_with_3_plus_criticals
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Critical Band'[Critical Band Key]
-        = 3 ) )
-  datatype: Decimal
-  description: 'Inspections with violation data that cited three or more critical violations (each jurisdiction''s
-    own critical flag). No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which doesn''t
-    port.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: '#,0'
-      display_folder: Findings
-- name: share_with_3_plus_criticals
-  expression:
-    dialects:
-    - dialect: DAX
-      expression: DIVIDE ( COALESCE ( [Inspections with 3+ criticals], 0 ), [Inspections with violation data] )
-  datatype: Decimal
-  description: 'Share of inspections with violation data that cited three or more critical violations. No OSSIE_SQL_2026
-    expression: Depends on `inspections_with_3_plus_criticals`, which doesn''t port.'
-  nonportable_extensions:
-  - vendor_name: power_bi
-    data:
-      format_string: 0.0%
-      display_folder: Findings
 - name: inspections_with_a_verdict
   expression:
     dialects:
@@ -1234,8 +1233,9 @@ metrics:
       expression: DIVIDE ( COALESCE ( [Violations], 0 ), [Inspections with violation data] )
   datatype: Decimal
   description: 'Violations per inspection with violation data (Austin left out). With a category picked, that category''s
-    violations per inspection. No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which
-    doesn''t port.'
+    violations per inspection. No OSSIE_SQL_2026 expression: Divides a Fact Violation count by a Fact Inspection
+    count. A dataset metric aggregates one dataset, and this twin does not compose model metrics across the two
+    facts.'
   nonportable_extensions:
   - vendor_name: power_bi
     data:
@@ -1250,7 +1250,8 @@ metrics:
   description: 'The headline comparable measure: critical violations per inspection with violation data (Austin
     left out). Compares what inspectors found, not how each jurisdiction judged it. Still read with Jurisdiction[Critical
     Means]: Toronto''s and Boston''s critical are wider than NYC''s, so NYC''s 1.87 is, if anything, an undercount
-    next to them. No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which doesn''t port.'
+    next to them. No OSSIE_SQL_2026 expression: Divides a Fact Violation count by a Fact Inspection count. A dataset
+    metric aggregates one dataset, and this twin does not compose model metrics across the two facts.'
   nonportable_extensions:
   - vendor_name: power_bi
     data:
@@ -1264,7 +1265,8 @@ metrics:
   datatype: Decimal
   description: 'Share of inspections with violation data that cited at least one violation in context (with a category
     picked: the share citing that category, for example pests at 31.8% of NYC routine inspections). No OSSIE_SQL_2026
-    expression: Depends on `inspections_with_violation_data`, which doesn''t port.'
+    expression: Divides a Fact Violation count by a Fact Inspection count. A dataset metric aggregates one dataset,
+    and this twin does not compose model metrics across the two facts.'
   nonportable_extensions:
   - vendor_name: power_bi
     data:

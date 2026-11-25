@@ -6,8 +6,10 @@ Twin: [`restaurant-inspections.ossie.yaml`](restaurant-inspections.ossie.yaml). 
 
 The two facts are a join of ten city inspection datasets built by a separate data pipeline (not yet published);
 the TMDL loads them through Power Query. The twin uses logical source names (`restaurant_inspections.<table>`).
-Most rates divide by inspections in jurisdictions that publish violations, a flag on the Jurisdiction table;
-Ossie's `FILTER (WHERE ...)` can't reach it from the fact, so every rate built on it stays DAX.
+Most rates divide by inspections in jurisdictions that publish violations, a flag on the Jurisdiction table.
+That table is typed in M and the flag is false only for Austin, so the flag ports as a filter on the fact's
+`jurisdiction_key`. Rates that divide Fact Violation by Fact Inspection, and filters on the outcome tier or
+closure flag (not a function of a fact column), stay DAX.
 
 ## Tables
 
@@ -48,19 +50,19 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 
 ## Measures
 
-**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. One difference holds for every ported count: on an empty group DAX returns blank and SQL `COUNT` returns 0.
+**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. Two DAX blank rules are written into the SQL: a count of no rows is blank in DAX and 0 in SQL, so every count measure is `NULLIF(COUNT(...), 0)` (including a count whose filter matches nothing in a non-empty group); and DAX compares a blank as 0, so a filter that 0 passes (`= 0`, `< 250000`) is written on `COALESCE(column, 0)`.
 
 | Measure | Verdict | Ossie SQL, or why not |
 | --- | --- | --- |
-| Inspections | Ports as SQL | `COUNT(*)` |
-| Inspections with violation data | Doesn't port | *filter on a dimension attribute*: `FILTER (WHERE ...)` may only reference the aggregate's own dataset, and the fact has no copy of that column. |
-| Establishments inspected | Ports as SQL | `COUNT(DISTINCT establishment_key)` |
-| Inspections per establishment | Ports as SQL | `COUNT(*) / NULLIF(COUNT(DISTINCT establishment_key), 0)` |
-| Follow-up share | Ports as SQL | `COALESCE(COUNT(*) FILTER (WHERE visit_kind_key = 2), 0) / NULLIF(COUNT(*), 0)` |
-| Share with no violation | Doesn't port | *filter on a dimension attribute*: Depends on `inspections_with_violation_data`, which doesn't port. |
+| Inspections | Ports as SQL | `NULLIF(COUNT(*), 0)` |
+| Inspections with violation data | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state', 'boston', 'toronto')), 0)`. `Jurisdiction[Publishes Violations]` is true for these nine keys (the Jurisdiction table is typed in M; only Austin is false), and the fact carries `jurisdiction_key`. |
+| Establishments inspected | Ports as SQL | `NULLIF(COUNT(DISTINCT establishment_key), 0)` |
+| Inspections per establishment | Ports as SQL | `NULLIF(COUNT(*), 0) / NULLIF(COUNT(DISTINCT establishment_key), 0)` |
+| Follow-up share | Ports as SQL | `COUNT(*) FILTER (WHERE visit_kind_key = 2) / NULLIF(COUNT(*), 0)` |
+| Share with no violation | Ports as SQL | `COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state', 'boston', 'toronto') AND COALESCE(violation_count, 0) = 0) / NULLIF(COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state', 'boston', 'toronto')), 0)`. `Jurisdiction[Publishes Violations]` is true for these nine keys (the Jurisdiction table is typed in M; only Austin is false), and the fact carries `jurisdiction_key`. DAX compares a blank violation count as 0, hence the `COALESCE`. |
 | Average burden score | Ports as SQL | `AVG(burden_score)` |
-| Inspections with 3+ criticals | Doesn't port | *filter on a dimension attribute*: Depends on `inspections_with_violation_data`, which doesn't port. |
-| Share with 3+ criticals | Doesn't port | *filter on a dimension attribute*: Depends on `inspections_with_3_plus_criticals`, which doesn't port. |
+| Inspections with 3+ criticals | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state', 'boston', 'toronto') AND critical_band_key = 3), 0)`. `Jurisdiction[Publishes Violations]` is true for these nine keys (the Jurisdiction table is typed in M; only Austin is false), and the fact carries `jurisdiction_key`. |
+| Share with 3+ criticals | Ports as SQL | `COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state', 'boston', 'toronto') AND critical_band_key = 3) / NULLIF(COUNT(*) FILTER (WHERE jurisdiction_key IN ('nyc', 'chicago', 'king_county', 'montgomery', 'delaware', 'marin', 'ny_state', 'boston', 'toronto')), 0)`. `Jurisdiction[Publishes Violations]` is true for these nine keys (the Jurisdiction table is typed in M; only Austin is false), and the fact carries `jurisdiction_key`. |
 | Inspections with a verdict | Doesn't port | *filter on a dimension attribute*: `FILTER (WHERE ...)` may only reference the aggregate's own dataset, and the fact has no copy of that column. |
 | Re-inspection rate at 3+ criticals | Doesn't port | *filter on a dimension attribute*: Depends on `inspections_with_a_verdict`, which doesn't port. |
 | Closures | Doesn't port | *filter on a dimension attribute*: `FILTER (WHERE ...)` may only reference the aggregate's own dataset, and the fact has no copy of that column. |
@@ -70,23 +72,23 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 | Last inspection date | Doesn't port | *needs filter context*: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 | Inspections prior year | Doesn't port | *time intelligence*: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |
 | Inspections YoY % | Doesn't port | *time intelligence*: Depends on `inspections_prior_year`, which doesn't port. |
-| Violations | Ports as SQL | `COUNT(*)` |
-| Critical violations | Ports as SQL | `COUNT(*) FILTER (WHERE critical_flag = 'Critical')` |
-| Critical share of violations | Ports as SQL | `COUNT(*) FILTER (WHERE critical_flag = 'Critical') / NULLIF(COUNT(*), 0)` |
-| Violations per inspection | Doesn't port | *filter on a dimension attribute*: Depends on `inspections_with_violation_data`, which doesn't port. |
-| Critical violations per inspection | Doesn't port | *filter on a dimension attribute*: Depends on `inspections_with_violation_data`, which doesn't port. |
-| Inspections citing | Ports as SQL | `COUNT(DISTINCT inspection_key)` |
-| Share of inspections citing | Doesn't port | *filter on a dimension attribute*: Depends on `inspections_with_violation_data`, which doesn't port. |
-| Chain critical per inspection | Doesn't port | *filter on a dimension attribute*: Depends on `critical_violations_per_inspection`, which doesn't port. |
-| Independent critical per inspection | Doesn't port | *filter on a dimension attribute*: Depends on `critical_violations_per_inspection`, which doesn't port. |
+| Violations | Ports as SQL | `NULLIF(COUNT(*), 0)` |
+| Critical violations | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE critical_flag = 'Critical'), 0)` |
+| Critical share of violations | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE critical_flag = 'Critical'), 0) / NULLIF(COUNT(*), 0)` |
+| Violations per inspection | Doesn't port | *divides measures of two facts*: Divides a Fact Violation count by a Fact Inspection count. A dataset metric aggregates one dataset, and this twin does not compose model metrics across the two facts. |
+| Critical violations per inspection | Doesn't port | *divides measures of two facts*: Divides a Fact Violation count by a Fact Inspection count. A dataset metric aggregates one dataset, and this twin does not compose model metrics across the two facts. |
+| Inspections citing | Ports as SQL | `NULLIF(COUNT(DISTINCT inspection_key), 0)` |
+| Share of inspections citing | Doesn't port | *divides measures of two facts*: Divides a Fact Violation count by a Fact Inspection count. A dataset metric aggregates one dataset, and this twin does not compose model metrics across the two facts. |
+| Chain critical per inspection | Doesn't port | *divides measures of two facts*: Depends on `critical_violations_per_inspection`, which doesn't port. |
+| Independent critical per inspection | Doesn't port | *divides measures of two facts*: Depends on `critical_violations_per_inspection`, which doesn't port. |
 | Chain ratio | Doesn't port | *needs filter context*: `HASONEVALUE` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 | Critical per inspection prior year | Doesn't port | *time intelligence*: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |
 | Critical per inspection change | Doesn't port | *time intelligence*: Depends on `critical_per_inspection_prior_year`, which doesn't port. |
 | Attribution | Doesn't port | *text, not a number*: a citation or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate. |
 
-**Count:** 31 measures. 9 port as SQL, 0 port with changes, 22 don't port (9 of 31 ported).
+**Count:** 31 measures. 13 port as SQL, 0 port with changes, 18 don't port (13 of 31 ported).
 
-Why the rest don't port: filter on a dimension attribute (15); time intelligence (4); needs filter context (2); text, not a number (1).
+Why the rest don't port: filter on a dimension attribute (6); divides measures of two facts (5); time intelligence (4); needs filter context (2); text, not a number (1).
 
 ## What was validated
 

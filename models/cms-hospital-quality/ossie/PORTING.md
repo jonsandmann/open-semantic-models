@@ -38,7 +38,7 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 
 ## Measures
 
-**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. One difference holds for every ported count: on an empty group DAX returns blank and SQL `COUNT` returns 0.
+**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. Two DAX blank rules are written into the SQL: a count of no rows is blank in DAX and 0 in SQL, so every count measure is `NULLIF(COUNT(...), 0)` (including a count whose filter matches nothing in a non-empty group); and DAX compares a blank as 0, so a filter that 0 passes (`= 0`, `< 250000`) is written on `COALESCE(column, 0)`.
 
 | Measure | Verdict | Ossie SQL, or why not |
 | --- | --- | --- |
@@ -68,8 +68,8 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 | Mortality measures worse | Doesn't port | *semi-additive*: keeps only the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026 aggregate can't pin itself to the max of the query's own rows without a subquery. |
 | Safety measures worse | Doesn't port | *semi-additive*: keeps only the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026 aggregate can't pin itself to the max of the query's own rows without a subquery. |
 | Readmission measures worse | Doesn't port | *semi-additive*: keeps only the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026 aggregate can't pin itself to the max of the query's own rows without a subquery. |
-| Hospitals | Ports as SQL | `COUNT(*)` |
-| Birthing friendly hospitals | Ports as SQL | `COUNT(*) FILTER (WHERE birthing_friendly = 'Y')` |
+| Hospitals | Ports as SQL | `NULLIF(COUNT(*), 0)` |
+| Birthing friendly hospitals | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE birthing_friendly = 'Y'), 0)` |
 
 **Count:** 28 measures. 4 port as SQL, 0 port with changes, 24 don't port (4 of 28 ported).
 

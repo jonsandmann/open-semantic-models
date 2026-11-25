@@ -39,24 +39,24 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 
 ## Measures
 
-**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. One difference holds for every ported count: on an empty group DAX returns blank and SQL `COUNT` returns 0.
+**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. Two DAX blank rules are written into the SQL: a count of no rows is blank in DAX and 0 in SQL, so every count measure is `NULLIF(COUNT(...), 0)` (including a count whose filter matches nothing in a non-empty group); and DAX compares a blank as 0, so a filter that 0 passes (`= 0`, `< 250000`) is written on `COALESCE(column, 0)`.
 
 | Measure | Verdict | Ossie SQL, or why not |
 | --- | --- | --- |
-| Sales | Ports as SQL | `COUNT(*) FILTER (WHERE is_standard_sale = TRUE)` |
-| All records | Ports as SQL | `COUNT(*)` |
-| Deleted records | Ports as SQL | `COUNT(*) FILTER (WHERE record_status = 'Deleted')` |
-| Additional transfers | Ports as SQL | `COUNT(*) FILTER (WHERE category = 'Additional' AND record_status <> 'Deleted')` |
+| Sales | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE is_standard_sale = TRUE), 0)` |
+| All records | Ports as SQL | `NULLIF(COUNT(*), 0)` |
+| Deleted records | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE record_status = 'Deleted'), 0)` |
+| Additional transfers | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE category = 'Additional' AND record_status <> 'Deleted'), 0)` |
 | Median price | Ports as SQL | `MEDIAN(price_gbp) FILTER (WHERE is_standard_sale = TRUE)` |
 | Mean price | Ports as SQL | `AVG(price_gbp) FILTER (WHERE is_standard_sale = TRUE)` |
 | Total consideration | Ports as SQL | `SUM(price_gbp) FILTER (WHERE is_standard_sale = TRUE)` |
 | Lowest price | Ports as SQL | `MIN(price_gbp) FILTER (WHERE is_standard_sale = TRUE)` |
 | Highest price | Ports as SQL | `MAX(price_gbp) FILTER (WHERE is_standard_sale = TRUE)` |
 | Share of sales | Doesn't port | *needs filter context*: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
-| Freehold share | Ports as SQL | `COUNT(*) FILTER (WHERE duration_code = 'F' AND is_standard_sale = TRUE) / NULLIF(COUNT(*) FILTER (WHERE is_standard_sale = TRUE), 0)` |
-| New build sales | Ports as SQL | `COUNT(*) FILTER (WHERE build = 'New build' AND is_standard_sale = TRUE)` |
-| Sales under £250,000 | Ports as SQL | `COUNT(*) FILTER (WHERE price_gbp < 250000 AND is_standard_sale = TRUE)` |
-| Sales of £1 million or more | Ports as SQL | `COUNT(*) FILTER (WHERE price_gbp >= 1000000 AND is_standard_sale = TRUE)` |
+| Freehold share | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE duration_code = 'F' AND is_standard_sale = TRUE), 0) / NULLIF(COUNT(*) FILTER (WHERE is_standard_sale = TRUE), 0)` |
+| New build sales | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE build = 'New build' AND is_standard_sale = TRUE), 0)` |
+| Sales under £250,000 | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE COALESCE(price_gbp, 0) < 250000 AND is_standard_sale = TRUE), 0)` |
+| Sales of £1 million or more | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE price_gbp >= 1000000 AND is_standard_sale = TRUE), 0)` |
 | Share of consideration | Doesn't port | *needs filter context*: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 | Sales prior month | Doesn't port | *time intelligence*: `DATEADD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |
 | Median price prior month | Doesn't port | *time intelligence*: `DATEADD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |

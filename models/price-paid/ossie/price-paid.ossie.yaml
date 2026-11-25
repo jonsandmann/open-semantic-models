@@ -335,7 +335,7 @@ datasets:
   metrics:
   - name: sales
     expression:
-      sql: COUNT(*) FILTER (WHERE is_standard_sale = TRUE)
+      sql: NULLIF(COUNT(*) FILTER (WHERE is_standard_sale = TRUE), 0)
     datatype: Decimal
     description: 'Standard Price Paid transfers (category A) that the file does not delete: the sales count every
       price measure is built on.'
@@ -347,7 +347,7 @@ datasets:
         display_folder: Volume
   - name: all_records
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: 'Every record in the filter context: standard and additional, added, changed and deleted.'
     nonportable_extensions:
@@ -358,7 +358,7 @@ datasets:
         display_folder: Audit
   - name: deleted_records
     expression:
-      sql: COUNT(*) FILTER (WHERE record_status = 'Deleted')
+      sql: NULLIF(COUNT(*) FILTER (WHERE record_status = 'Deleted'), 0)
     datatype: Decimal
     description: Records the file deletes. A delete withdraws an earlier record and is not a sale.
     nonportable_extensions:
@@ -369,7 +369,7 @@ datasets:
         display_folder: Audit
   - name: additional_transfers
     expression:
-      sql: COUNT(*) FILTER (WHERE category = 'Additional' AND record_status <> 'Deleted')
+      sql: NULLIF(COUNT(*) FILTER (WHERE category = 'Additional' AND record_status <> 'Deleted'), 0)
     datatype: Decimal
     description: 'Additional Price Paid transfers (category B: repossessions, buy-to-lets, non-private buyers, property
       typed Other) that are not deleted. Kept out of Sales and every price measure.'
@@ -445,8 +445,8 @@ datasets:
         display_folder: Price
   - name: freehold_share
     expression:
-      sql: COUNT(*) FILTER (WHERE duration_code = 'F' AND is_standard_sale = TRUE) / NULLIF(COUNT(*) FILTER (WHERE
-        is_standard_sale = TRUE), 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE duration_code = 'F' AND is_standard_sale = TRUE), 0) / NULLIF(COUNT(*)
+        FILTER (WHERE is_standard_sale = TRUE), 0)
     datatype: Decimal
     description: Freehold standard sales as a share of standard sales in the filter context.
     nonportable_extensions:
@@ -457,7 +457,7 @@ datasets:
         display_folder: Mix
   - name: new_build_sales
     expression:
-      sql: COUNT(*) FILTER (WHERE build = 'New build' AND is_standard_sale = TRUE)
+      sql: NULLIF(COUNT(*) FILTER (WHERE build = 'New build' AND is_standard_sale = TRUE), 0)
     datatype: Decimal
     description: Standard sales of newly built property. Most new-build sales are registered months after completion,
       so a recent month in one update file holds few of them; do not read it as the new-build market.
@@ -469,7 +469,7 @@ datasets:
         display_folder: Mix
   - name: sales_under_250_000
     expression:
-      sql: COUNT(*) FILTER (WHERE price_gbp < 250000 AND is_standard_sale = TRUE)
+      sql: NULLIF(COUNT(*) FILTER (WHERE COALESCE(price_gbp, 0) < 250000 AND is_standard_sale = TRUE), 0)
     datatype: Decimal
     description: Standard sales at a price under £250,000.
     nonportable_extensions:
@@ -480,7 +480,7 @@ datasets:
         display_folder: Mix
   - name: sales_of_1_million_or_more
     expression:
-      sql: COUNT(*) FILTER (WHERE price_gbp >= 1000000 AND is_standard_sale = TRUE)
+      sql: NULLIF(COUNT(*) FILTER (WHERE price_gbp >= 1000000 AND is_standard_sale = TRUE), 0)
     datatype: Decimal
     description: Standard sales at a price of £1,000,000 or more.
     nonportable_extensions:

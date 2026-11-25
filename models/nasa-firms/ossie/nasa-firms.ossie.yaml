@@ -329,7 +329,7 @@ datasets:
   metrics:
   - name: all_product_rows
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: 'Every detection row in context, all sources added. Audit only: it counts the same fire once per
       product that saw it.'

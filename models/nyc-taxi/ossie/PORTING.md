@@ -40,14 +40,14 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 
 ## Measures
 
-**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. One difference holds for every ported count: on an empty group DAX returns blank and SQL `COUNT` returns 0.
+**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. Two DAX blank rules are written into the SQL: a count of no rows is blank in DAX and 0 in SQL, so every count measure is `NULLIF(COUNT(...), 0)` (including a count whose filter matches nothing in a non-empty group); and DAX compares a blank as 0, so a filter that 0 passes (`= 0`, `< 250000`) is written on `COALESCE(column, 0)`.
 
 | Measure | Verdict | Ossie SQL, or why not |
 | --- | --- | --- |
-| Trips | Ports as SQL | `COUNT(*)` |
+| Trips | Ports as SQL | `NULLIF(COUNT(*), 0)` |
 | Passengers | Ports as SQL | `SUM(passenger_count)` |
 | Avg Passengers per Trip | Ports as SQL | `SUM(passenger_count) / NULLIF(COUNT(*) FILTER (WHERE passenger_count IS NOT NULL), 0)` |
-| Trips per Day | Ports as SQL | `COUNT(*) / NULLIF(COUNT(DISTINCT pickup_date), 0)` |
+| Trips per Day | Ports as SQL | `NULLIF(COUNT(*), 0) / NULLIF(COUNT(DISTINCT pickup_date), 0)` |
 | Total Miles | Ports as SQL | `SUM(trip_miles)` |
 | Avg Miles per Trip | Ports as SQL | `SUM(trip_miles) / NULLIF(COUNT(*), 0)` |
 | Trip Hours | Ports as SQL | `SUM(trip_minutes) / 60` |
@@ -56,21 +56,21 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 | Fare Revenue | Ports as SQL | `SUM(fare_amount)` |
 | Tips | Ports as SQL | `SUM(tip_amount)` |
 | Tolls | Ports as SQL | `SUM(tolls_amount)` |
-| Taxes and Surcharges | Ports as SQL | `SUM(extra_amount) + SUM(mta_tax) + SUM(improvement_surcharge) + SUM(congestion_surcharge) + SUM(airport_fee) + SUM(cbd_congestion_fee)` |
+| Taxes and Surcharges | Ports as SQL | `COALESCE(SUM(extra_amount), 0) + COALESCE(SUM(mta_tax), 0) + COALESCE(SUM(improvement_surcharge), 0) + SUM(congestion_surcharge) + SUM(airport_fee) + SUM(cbd_congestion_fee)`. DAX adds a blank SUM as 0; SQL `+` with a NULL is NULL, so the three columns Power Query leaves null get `COALESCE`. Power Query fills null congestion surcharge, airport fee and CBD fee with 0, so those three SUMs are NULL only on a group with no trips, where the DAX is blank too. |
 | CBD Congestion Fees | Ports as SQL | `SUM(cbd_congestion_fee)` |
 | Total Revenue | Ports as SQL | `SUM(total_amount)` |
 | Avg Fare per Trip | Ports as SQL | `SUM(fare_amount) / NULLIF(COUNT(*), 0)` |
 | Avg Revenue per Trip | Ports as SQL | `SUM(total_amount) / NULLIF(COUNT(*), 0)` |
 | Fare per Mile | Ports as SQL | `SUM(fare_amount) / NULLIF(SUM(trip_miles), 0)` |
-| Card Trips | Ports as SQL | `COUNT(*) FILTER (WHERE payment_type_id = 1)` |
-| Card Payment % | Ports as SQL | `COUNT(*) FILTER (WHERE payment_type_id = 1) / NULLIF(COUNT(*), 0)` |
+| Card Trips | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE payment_type_id = 1), 0)` |
+| Card Payment % | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE payment_type_id = 1), 0) / NULLIF(COUNT(*), 0)` |
 | Card Tips | Ports as SQL | `SUM(tip_amount) FILTER (WHERE payment_type_id = 1)` |
 | Card Tip Rate % | Ports as SQL | `SUM(tip_amount) FILTER (WHERE payment_type_id = 1) / NULLIF(SUM(fare_amount) FILTER (WHERE payment_type_id = 1), 0)` |
 | Avg Tip per Card Trip | Ports as SQL | `SUM(tip_amount) FILTER (WHERE payment_type_id = 1) / NULLIF(COUNT(*) FILTER (WHERE payment_type_id = 1), 0)` |
-| Airport Pickups | Ports as SQL | `COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138))` |
-| Airport Pickup % | Ports as SQL | `COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138)) / NULLIF(COUNT(*), 0)` |
-| CBD Zone Trips | Ports as SQL | `COUNT(*) FILTER (WHERE cbd_congestion_fee > 0)` |
-| CBD Zone Trip % | Ports as SQL | `COUNT(*) FILTER (WHERE cbd_congestion_fee > 0) / NULLIF(COUNT(*), 0)` |
+| Airport Pickups | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138)), 0)` |
+| Airport Pickup % | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138)), 0) / NULLIF(COUNT(*), 0)` |
+| CBD Zone Trips | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE cbd_congestion_fee > 0), 0)` |
+| CBD Zone Trip % | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE cbd_congestion_fee > 0), 0) / NULLIF(COUNT(*), 0)` |
 | Last Trip Date | Doesn't port | *needs filter context*: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 | Trips YTD | Doesn't port | *time intelligence*: `DATESYTD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |
 | Trips PY | Doesn't port | *time intelligence*: `DATEADD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can't move the query's date filter. |

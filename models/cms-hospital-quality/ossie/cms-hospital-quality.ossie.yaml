@@ -458,7 +458,7 @@ datasets:
   metrics:
   - name: hospitals
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: 'Hospitals in the Hospital table that match the Hospital filters (type, state, ownership...), whatever
       their rating or reporting. A count of the dimension: Performance Date, Release Date and Quality Measure slicers
@@ -472,7 +472,7 @@ datasets:
         display_folder: Hospital
   - name: birthing_friendly_hospitals
     expression:
-      sql: COUNT(*) FILTER (WHERE birthing_friendly = 'Y')
+      sql: NULLIF(COUNT(*) FILTER (WHERE birthing_friendly = 'Y'), 0)
     datatype: Decimal
     description: 'Hospitals that meet CMS''s birthing-friendly designation criteria (Birthing Friendly = "Y"). A
       count of the dimension, like Hospitals: date and measure slicers do not change it.'

@@ -242,7 +242,8 @@ datasets:
   metrics:
   - name: kinds_in_total
     expression:
-      sql: COUNT(DISTINCT kind_key) FILTER (WHERE include_in_total = TRUE AND cell_status = 'Published')
+      sql: NULLIF(COUNT(DISTINCT kind_key) FILTER (WHERE include_in_total = TRUE AND cell_status = 'Published'),
+        0)
     datatype: Decimal
     description: 'Kind lines counted in Sales that have a published figure in context. Should be 13 for any month:
       a completeness check on the double-counting guard.'
@@ -255,7 +256,7 @@ datasets:
         display_folder: Audit
   - name: suppressed_cells
     expression:
-      sql: COUNT(*) FILTER (WHERE cell_status = 'Suppressed')
+      sql: NULLIF(COUNT(*) FILTER (WHERE cell_status = 'Suppressed'), 0)
     datatype: Decimal
     description: 'Cells Census withheld, marked (S): the estimate did not meet publication standards. Stored blank,
       never zero.'
@@ -268,7 +269,7 @@ datasets:
         display_folder: Audit
   - name: not_available_cells
     expression:
-      sql: COUNT(*) FILTER (WHERE cell_status = 'Not available')
+      sql: NULLIF(COUNT(*) FILTER (WHERE cell_status = 'Not available'), 0)
     datatype: Decimal
     description: Cells Census marked (NA), not available (mostly seasonally adjusted lines that are not adjusted).
       Stored blank, never zero.
@@ -281,7 +282,7 @@ datasets:
         display_folder: Audit
   - name: months_in_scope
     expression:
-      sql: COUNT(DISTINCT date)
+      sql: NULLIF(COUNT(DISTINCT date), 0)
     datatype: Integer
     description: Number of distinct months with data in the current filter context. A full year has 12.
     nonportable_extensions:

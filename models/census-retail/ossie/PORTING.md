@@ -33,7 +33,7 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 
 ## Measures
 
-**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. One difference holds for every ported count: on an empty group DAX returns blank and SQL `COUNT` returns 0.
+**Ports as SQL**: the metric has an OSSIE_SQL_2026 expression that returns the DAX measure's number under ordinary filters on the same columns. **Ports with changes**: it has a SQL expression, but the result differs from the DAX in a stated case. **Doesn't port**: the DAX is carried as an opaque `DAX` dialect entry only, with the reason; nothing is faked as SQL. Every measure keeps its DAX, format string and folder in a `power_bi` extension. Two DAX blank rules are written into the SQL: a count of no rows is blank in DAX and 0 in SQL, so every count measure is `NULLIF(COUNT(...), 0)` (including a count whose filter matches nothing in a non-empty group); and DAX compares a blank as 0, so a filter that 0 passes (`= 0`, `< 250000`) is written on `COALESCE(column, 0)`.
 
 | Measure | Verdict | Ossie SQL, or why not |
 | --- | --- | --- |
@@ -55,11 +55,11 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 | Not adjusted sales | Doesn't port | *needs filter context*: `HASONEVALUE` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 | Seasonally adjusted sales | Doesn't port | *needs filter context*: `HASONEVALUE` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 | Seasonal factor | Doesn't port | *needs filter context*: Depends on `not_adjusted_sales`, which doesn't port. |
-| Kinds in total | Ports as SQL | `COUNT(DISTINCT kind_key) FILTER (WHERE include_in_total = TRUE AND cell_status = 'Published')` |
-| Suppressed cells | Ports as SQL | `COUNT(*) FILTER (WHERE cell_status = 'Suppressed')` |
-| Not available cells | Ports as SQL | `COUNT(*) FILTER (WHERE cell_status = 'Not available')` |
+| Kinds in total | Ports as SQL | `NULLIF(COUNT(DISTINCT kind_key) FILTER (WHERE include_in_total = TRUE AND cell_status = 'Published'), 0)` |
+| Suppressed cells | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE cell_status = 'Suppressed'), 0)` |
+| Not available cells | Ports as SQL | `NULLIF(COUNT(*) FILTER (WHERE cell_status = 'Not available'), 0)` |
 | Preliminary sales | Doesn't port | *needs filter context*: Depends on `sales`, which doesn't port. |
-| Months in scope | Ports as SQL | `COUNT(DISTINCT date)` |
+| Months in scope | Ports as SQL | `NULLIF(COUNT(DISTINCT date), 0)` |
 | Last Data Date | Doesn't port | *needs filter context*: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE. |
 
 **Count:** 24 measures. 4 port as SQL, 0 port with changes, 20 don't port (4 of 24 ported).

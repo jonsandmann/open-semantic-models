@@ -562,7 +562,7 @@ datasets:
   metrics:
   - name: trips
     expression:
-      sql: COUNT(*)
+      sql: NULLIF(COUNT(*), 0)
     datatype: Integer
     description: Number of trips. The base count every other trip measure builds on.
     nonportable_extensions:
@@ -596,7 +596,7 @@ datasets:
         display_folder: Volume
   - name: trips_per_day
     expression:
-      sql: COUNT(*) / NULLIF(COUNT(DISTINCT pickup_date), 0)
+      sql: NULLIF(COUNT(*), 0) / NULLIF(COUNT(DISTINCT pickup_date), 0)
     datatype: Decimal
     description: Average trips per calendar day that has trips in the current filter context.
     nonportable_extensions:
@@ -700,8 +700,8 @@ datasets:
         display_folder: Revenue
   - name: taxes_and_surcharges
     expression:
-      sql: SUM(extra_amount) + SUM(mta_tax) + SUM(improvement_surcharge) + SUM(congestion_surcharge) + SUM(airport_fee)
-        + SUM(cbd_congestion_fee)
+      sql: COALESCE(SUM(extra_amount), 0) + COALESCE(SUM(mta_tax), 0) + COALESCE(SUM(improvement_surcharge), 0)
+        + SUM(congestion_surcharge) + SUM(airport_fee) + SUM(cbd_congestion_fee)
     datatype: Decimal
     description: Extras, MTA tax, improvement surcharge, NYS congestion surcharge, airport fee and the MTA congestion
       relief zone (CBD) fee.
@@ -770,7 +770,7 @@ datasets:
         display_folder: Revenue
   - name: card_trips
     expression:
-      sql: COUNT(*) FILTER (WHERE payment_type_id = 1)
+      sql: NULLIF(COUNT(*) FILTER (WHERE payment_type_id = 1), 0)
     datatype: Decimal
     description: Trips paid by credit card, the only payment type with recorded tips.
     nonportable_extensions:
@@ -781,7 +781,7 @@ datasets:
         display_folder: Tipping
   - name: card_payment_pct
     expression:
-      sql: COUNT(*) FILTER (WHERE payment_type_id = 1) / NULLIF(COUNT(*), 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE payment_type_id = 1), 0) / NULLIF(COUNT(*), 0)
     datatype: Decimal
     description: Share of trips paid by credit card.
     nonportable_extensions:
@@ -829,7 +829,7 @@ datasets:
         display_folder: Tipping
   - name: airport_pickups
     expression:
-      sql: COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138))
+      sql: NULLIF(COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138)), 0)
     datatype: Decimal
     description: Trips picked up at JFK, LaGuardia or Newark airport (taxi zones 132, 138 and 1).
     nonportable_extensions:
@@ -840,7 +840,7 @@ datasets:
         display_folder: Mix
   - name: airport_pickup_pct
     expression:
-      sql: COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138)) / NULLIF(COUNT(*), 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138)), 0) / NULLIF(COUNT(*), 0)
     datatype: Decimal
     description: Share of trips picked up at an airport.
     nonportable_extensions:
@@ -851,7 +851,7 @@ datasets:
         display_folder: Mix
   - name: cbd_zone_trips
     expression:
-      sql: COUNT(*) FILTER (WHERE cbd_congestion_fee > 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE cbd_congestion_fee > 0), 0)
     datatype: Decimal
     description: Trips charged the Manhattan congestion relief zone (CBD) fee.
     nonportable_extensions:
@@ -862,7 +862,7 @@ datasets:
         display_folder: Mix
   - name: cbd_zone_trip_pct
     expression:
-      sql: COUNT(*) FILTER (WHERE cbd_congestion_fee > 0) / NULLIF(COUNT(*), 0)
+      sql: NULLIF(COUNT(*) FILTER (WHERE cbd_congestion_fee > 0), 0) / NULLIF(COUNT(*), 0)
     datatype: Decimal
     description: Share of trips charged the congestion relief zone (CBD) fee.
     nonportable_extensions:
