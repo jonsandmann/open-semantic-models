@@ -1,6 +1,6 @@
 # Ossie twins
 
-Every model in this repo also has an [Apache Ossie](https://github.com/apache/ossie) twin: the same tables,
+The first nine models in this repo also have an [Apache Ossie](https://github.com/apache/ossie) twin: the same tables,
 relationships and measures written as one YAML document in the Ossie Core Metadata Specification, so a tool that
 reads Ossie (rather than TMDL) can use the model's definitions. Each twin sits next to its model in
 `models/<name>/ossie/`, with a `PORTING.md` that gives a verdict for every table, relationship and measure.
