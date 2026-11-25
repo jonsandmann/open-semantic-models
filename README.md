@@ -29,7 +29,7 @@ Each model lives in `models/<name>/` with:
 | [City Spending](models/spending/README.md) | Our data factory's join of nine city checkbooks (Chicago, Los Angeles, San Francisco, Austin, Dallas, Kansas City, Cincinnati, Atlanta, Boston), function crosswalk and normalized vendor key | Each city's open data terms; Census population public domain | One row per payment line | 4.05M lines, $105.2B (latest two fiscal years) |
 | [City Finances (ACFR)](models/city-finances/README.md) | Our data factory's read of 54 cities' audited ACFRs (50 largest US cities plus ten Washington cities), every figure citing its PDF page | Public records; Census population public domain | City x fiscal year x figure | 3,717 figures (FY2024-FY2025, prior years from 2023) |
 
-Every model also has an [Apache Ossie](https://github.com/apache/ossie) twin in `models/<name>/ossie/`, with a verdict for each measure: 92 of the 237 measures port to Ossie SQL. See [ossie/README.md](ossie/README.md).
+The first nine models also have an [Apache Ossie](https://github.com/apache/ossie) twin in `models/<name>/ossie/`, with a verdict for each measure: 103 of their 237 measures port to Ossie SQL. See [ossie/README.md](ossie/README.md).
 
 ## Validating a model
 
