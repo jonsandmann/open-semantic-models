@@ -284,7 +284,8 @@ datasets:
       sql: housing_units_contribution
     datatype: Integer
     description: Dwelling units this row contributes to Housing Units after Austin de-duplication and Los Angeles
-      mixed-use inclusion.
+      mixed-use inclusion. Blank for Boston, New Orleans and Montgomery County (Jurisdiction[Units Published] false;
+      Montgomery's file carries a 1-per-house proxy that misses multifamily).
     nonportable_extensions:
     - vendor_name: power_bi
       data:
@@ -327,11 +328,12 @@ datasets:
     expression:
       sql: SUM(housing_units_contribution)
     datatype: Decimal
-    description: Net dwelling units on new homes, Census BPS convention (issue date). Austin related permits that
+    description: 'Net dwelling units on new homes, Census BPS convention (issue date). Austin related permits that
       copy the same unit count onto every building permit under one master (phases, fire areas, amenity buildings,
       identical descriptions on 2–4 permits) count once. Los Angeles mixed-use apartment buildings filed as Bldg-New
       Commercial Apartment are included. Boston, New Orleans and Montgomery County publish no usable unit counts
-      (blank here). Alteration conversions are excluded, matching BPS.
+      (blank here: Montgomery''s 1-per-house proxy, which counts nothing for multifamily, is not loaded). Alteration
+      conversions are excluded, matching BPS.'
     nonportable_extensions:
     - vendor_name: power_bi
       data:
@@ -376,15 +378,17 @@ datasets:
         display_folder: Speed
   - name: same_day_issue_share
     expression:
-      sql: COUNT(*) FILTER (WHERE COALESCE(days_apply_to_issue, 0) = 0) / NULLIF(COUNT(*) FILTER (WHERE days_apply_to_issue
-        IS NOT NULL), 0)
+      sql: COUNT(*) FILTER (WHERE days_apply_to_issue = 0) / NULLIF(COUNT(*) FILTER (WHERE days_apply_to_issue IS
+        NOT NULL), 0)
     datatype: Decimal
-    description: Share of permits in context issued the same day they were filed (Days Apply To Issue = 0).
+    description: 'Share of permits in context issued the same day they were filed (Days Apply To Issue == 0), over
+      permits that have both dates. Uses == because in DAX BLANK = 0 is true: permits with no apply-to-issue span
+      must not count as same-day.'
     nonportable_extensions:
     - vendor_name: power_bi
       data:
-        dax: DIVIDE ( COALESCE ( CALCULATE ( [Permits], KEEPFILTERS ( 'Fact Permit'[Days Apply To Issue] = 0 ) ),
-          0 ), CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Days Apply To Issue] ) ) ) )
+        dax: DIVIDE ( COALESCE ( CALCULATE ( [Permits], KEEPFILTERS ( 'Fact Permit'[Days Apply To Issue] == 0 )
+          ), 0 ), CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Days Apply To Issue] ) ) ) )
         format_string: 0%
         display_folder: Speed
   - name: valuation_usd

@@ -24,4 +24,10 @@ q("Q9 Latest year net pension liability: cities reporting, total, per resident o
  select count(*), sum(m), sum(m)*1e6/sum(p) from e""")
 q("Q10 Washington cities (latest): count with data, property tax share of total revenues across them", """
  select count(distinct fips_place), sum(value) filter (where figure_id='rev_property_tax')/sum(value) filter (where figure_id='rev_total')
- from l where state='WA' and fips_place in (select fips_place from read_csv('""" + os.path.expanduser("data-factory/cities/sources/cities.csv") + """', types={'fips_place':'VARCHAR'}) where "group"<>'top50')""")
+ from l where state='WA' and fips_place in (select fips_place from read_csv('""" + os.path.expanduser("data-factory/cities/sources/cities.csv") + """', types={'fips_place':'VARCHAR'}) where "group"='wa')""")
+q("Latest report only, growth over the cities with both years: revenues, expenses", """
+ with r as (select fips_place, fiscal_year fy, figure_id, sum(value) v from f group by all),
+ l2 as (select fips_place, max(fiscal_year) fy from f group by 1),
+ j as (select a.figure_id, a.v cur, b.v pri from r a join l2 using (fips_place, fy) join r b on b.fips_place=a.fips_place and b.fy=a.fy-1 and b.figure_id=a.figure_id
+       where a.figure_id in ('rev_total','exp_total'))
+ select figure_id, count(*), sum(pri), sum(cur)/sum(pri)-1 from j group by 1 order by 1""")

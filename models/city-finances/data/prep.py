@@ -6,6 +6,7 @@ OUT = os.path.dirname(os.path.abspath(__file__))
 c = duckdb.connect()
 c.sql(f"create view f as select * from read_csv('{SRC}/data/city_finances.csv', types={{'fips_place': 'VARCHAR'}})")
 c.sql(f"create view s as select * from read_csv('{SRC}/sources/cities.csv', types={{'fips_place': 'VARCHAR'}})")
+# City Group: Seattle is 'top50+wa' in the source and goes in Top 50 US city (one group per city).
 # Latest = the fiscal year of the city's own report; Prior = that report's comparative column.
 c.sql("create table latest as select fips_place, max(fiscal_year) fy from f group by 1")
 c.sql(f"""copy (select f.row_id, f.fips_place as city_key, f.fiscal_year,
@@ -18,7 +19,7 @@ c.sql(f"""copy (select f.fips_place || '|' || f.fiscal_year as report_key, any_v
   any_value(f.source_pdf_url) as source_pdf_url
 from f group by f.fips_place, f.fiscal_year order by 1) to '{OUT}/reports.parquet' (format parquet)""")
 c.sql(f"""copy (select s.fips_place as city_key, s.city || ', ' || s.state as city, s.state, s.population_2024 as population,
-  case s."group" when 'top50' then 'Top 50 US city' else 'Washington near Bellevue' end as city_group,
+  case when s."group" like 'top50%' then 'Top 50 US city' else 'Washington near Bellevue' end as city_group,
   t.fips_place is not null as in_data, coalesce(t.sums_ok, false) as table_sums_ok
 from s left join (select fips_place, bool_and(table_sums_ok) sums_ok from f group by 1) t using (fips_place)
 order by population desc) to '{OUT}/cities.parquet' (format parquet)""")

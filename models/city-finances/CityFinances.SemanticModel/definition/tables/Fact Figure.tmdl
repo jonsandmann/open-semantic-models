@@ -106,23 +106,23 @@ table 'Fact Figure'
 		formatString: \$#,0;(\$#,0);\$#,0
 		displayFolder: Per Resident
 
-	/// Total Revenues in the fiscal year before the one in context (the report's comparative column). Blank unless one fiscal year is in context.
-	measure 'Total Revenues Prior Year' = VAR FY = MAX ( 'Fiscal Year End'[Year] ) RETURN IF ( HASONEVALUE ( 'Fiscal Year End'[Year] ), CALCULATE ( [Total Revenues], REMOVEFILTERS ( 'Fiscal Year End' ), REMOVEFILTERS ( 'Year Position' ), REMOVEFILTERS ( Report ), 'Fiscal Year End'[Year] = FY - 1 ) )
+	/// Total Revenues in the fiscal year before the one in context (the report's comparative column), city by city: each city's fiscal year is read from its figures in context, so Year Position = Latest alone works (Bakersfield and Redmond step back from FY2024). A city with more than one fiscal year in context adds nothing.
+	measure 'Total Revenues Prior Year' = SUMX ( VALUES ( City[City Key] ), VAR FYE = CALCULATE ( MAX ( 'Fact Figure'[Fiscal Year End] ) ) RETURN IF ( CALCULATE ( DISTINCTCOUNT ( 'Fact Figure'[Fiscal Year End] ) ) = 1, CALCULATE ( [Total Revenues], REMOVEFILTERS ( 'Fiscal Year End' ), REMOVEFILTERS ( 'Year Position' ), REMOVEFILTERS ( Report ), 'Fiscal Year End'[Year] = YEAR ( FYE ) - 1 ) ) )
 		formatString: \$#,0;(\$#,0);\$#,0
 		displayFolder: Time
 
-	/// Change in Total Revenues over the prior fiscal year (Los Angeles FY2025 +11.1%).
-	measure 'Revenue Growth %' = DIVIDE ( [Total Revenues] - [Total Revenues Prior Year], [Total Revenues Prior Year] )
+	/// Change in Total Revenues over the prior fiscal year (Los Angeles FY2025 +11.1%), over the cities in context that have both years.
+	measure 'Revenue Growth %' = VAR Both = FILTER ( VALUES ( City[City Key] ), NOT ISBLANK ( [Total Revenues] ) && NOT ISBLANK ( [Total Revenues Prior Year] ) ) RETURN DIVIDE ( SUMX ( Both, [Total Revenues] - [Total Revenues Prior Year] ), SUMX ( Both, [Total Revenues Prior Year] ) )
 		formatString: 0.0%
 		displayFolder: Time
 
-	/// Total Expenses in the fiscal year before the one in context.
-	measure 'Total Expenses Prior Year' = VAR FY = MAX ( 'Fiscal Year End'[Year] ) RETURN IF ( HASONEVALUE ( 'Fiscal Year End'[Year] ), CALCULATE ( [Total Expenses], REMOVEFILTERS ( 'Fiscal Year End' ), REMOVEFILTERS ( 'Year Position' ), REMOVEFILTERS ( Report ), 'Fiscal Year End'[Year] = FY - 1 ) )
+	/// Total Expenses in the fiscal year before the one in context, city by city (as Total Revenues Prior Year).
+	measure 'Total Expenses Prior Year' = SUMX ( VALUES ( City[City Key] ), VAR FYE = CALCULATE ( MAX ( 'Fact Figure'[Fiscal Year End] ) ) RETURN IF ( CALCULATE ( DISTINCTCOUNT ( 'Fact Figure'[Fiscal Year End] ) ) = 1, CALCULATE ( [Total Expenses], REMOVEFILTERS ( 'Fiscal Year End' ), REMOVEFILTERS ( 'Year Position' ), REMOVEFILTERS ( Report ), 'Fiscal Year End'[Year] = YEAR ( FYE ) - 1 ) ) )
 		formatString: \$#,0;(\$#,0);\$#,0
 		displayFolder: Time
 
-	/// Change in Total Expenses over the prior fiscal year.
-	measure 'Expense Growth %' = DIVIDE ( [Total Expenses] - [Total Expenses Prior Year], [Total Expenses Prior Year] )
+	/// Change in Total Expenses over the prior fiscal year, over the cities in context that have both years.
+	measure 'Expense Growth %' = VAR Both = FILTER ( VALUES ( City[City Key] ), NOT ISBLANK ( [Total Expenses] ) && NOT ISBLANK ( [Total Expenses Prior Year] ) ) RETURN DIVIDE ( SUMX ( Both, [Total Expenses] - [Total Expenses Prior Year] ), SUMX ( Both, [Total Expenses Prior Year] ) )
 		formatString: 0.0%
 		displayFolder: Time
 

@@ -27,3 +27,6 @@ EVALUATE CALCULATETABLE ( ROW ( "npl", [Net Pension Liability], "cities", CALCUL
 
 // 10. Washington cities near Bellevue, latest report: cities and property tax share of revenues
 EVALUATE CALCULATETABLE ( ROW ( "cities", [Cities Reporting], "property_tax_share", [Property Tax Share of Revenues] ), City[City Group] = "Washington near Bellevue", 'Year Position'[Year Position] = "Latest" )
+
+// 11. Regression: Year Position = Latest alone, every city: revenue and expense growth over cities with both years (+3.68%, +2.83%; blank before 25 Nov)
+EVALUATE CALCULATETABLE ( ROW ( "rev_prior", [Total Revenues Prior Year], "rev_growth", [Revenue Growth %], "exp_growth", [Expense Growth %] ), 'Year Position'[Year Position] = "Latest" )

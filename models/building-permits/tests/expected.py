@@ -7,7 +7,9 @@ c = duckdb.connect()
 c.sql("SET memory_limit='3GB'")
 c.sql(f"create view p as select * from '{P}'")
 c.sql(f"create view h as select * from '{H}'")
-c.sql("create table f as select p.*, h.housing_units as hu from p left join h using (permit_id)")
+# Housing units are blank where Jurisdiction[Units Published] is false (Montgomery's 1-per-house proxy is not loaded).
+c.sql("""create table f as select p.*, case when p.jurisdiction in ('Boston, MA','New Orleans, LA','Montgomery County, MD')
+  then null else h.housing_units end as hu from p left join h using (permit_id)""")
 def q(t, s):
     print("\n##", t)
     res = c.sql(s)
@@ -46,3 +48,6 @@ q("Q10 Seattle new_res applications Jan-Oct", """
 select count(*) filter (where applied_date between date '2025-01-01' and date '2025-10-31'),
        count(*) filter (where applied_date between date '2026-01-01' and date '2026-10-31')
 from f where jurisdiction='Seattle, WA' and category='new_residential'""")
+q("Same-day issue share by jurisdiction, issue year 2025 (blank day-counts out of both sides)", """
+select jurisdiction, round(count(*) filter (where days_apply_to_issue = 0) / count(days_apply_to_issue), 4)
+from f where year(issued_date) = 2025 group by 1 order by 1""")

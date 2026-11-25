@@ -6,7 +6,7 @@ table 'Fact Permit'
 		formatString: #,0
 		displayFolder: Volume
 
-	/// Net dwelling units on new homes, Census BPS convention (issue date). Austin related permits that copy the same unit count onto every building permit under one master (phases, fire areas, amenity buildings, identical descriptions on 2–4 permits) count once. Los Angeles mixed-use apartment buildings filed as Bldg-New Commercial Apartment are included. Boston, New Orleans and Montgomery County publish no usable unit counts (blank here). Alteration conversions are excluded, matching BPS.
+	/// Net dwelling units on new homes, Census BPS convention (issue date). Austin related permits that copy the same unit count onto every building permit under one master (phases, fire areas, amenity buildings, identical descriptions on 2–4 permits) count once. Los Angeles mixed-use apartment buildings filed as Bldg-New Commercial Apartment are included. Boston, New Orleans and Montgomery County publish no usable unit counts (blank here: Montgomery's 1-per-house proxy, which counts nothing for multifamily, is not loaded). Alteration conversions are excluded, matching BPS.
 	measure 'Housing Units' = SUM ( 'Fact Permit'[Housing Units Contribution] )
 		formatString: #,0
 		displayFolder: Housing
@@ -36,8 +36,8 @@ table 'Fact Permit'
 		formatString: #,0
 		displayFolder: Speed
 
-	/// Share of permits in context issued the same day they were filed (Days Apply To Issue = 0).
-	measure 'Same-Day Issue Share' = DIVIDE ( COALESCE ( CALCULATE ( [Permits], KEEPFILTERS ( 'Fact Permit'[Days Apply To Issue] = 0 ) ), 0 ), CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Days Apply To Issue] ) ) ) )
+	/// Share of permits in context issued the same day they were filed (Days Apply To Issue == 0), over permits that have both dates. Uses == because in DAX BLANK = 0 is true: permits with no apply-to-issue span must not count as same-day.
+	measure 'Same-Day Issue Share' = DIVIDE ( COALESCE ( CALCULATE ( [Permits], KEEPFILTERS ( 'Fact Permit'[Days Apply To Issue] == 0 ) ), 0 ), CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Days Apply To Issue] ) ) ) )
 		formatString: 0%
 		displayFolder: Speed
 
@@ -182,7 +182,7 @@ table 'Fact Permit'
 		summarizeBy: none
 		sourceColumn: Units Added
 
-	/// Dwelling units this row contributes to Housing Units after Austin de-duplication and Los Angeles mixed-use inclusion.
+	/// Dwelling units this row contributes to Housing Units after Austin de-duplication and Los Angeles mixed-use inclusion. Blank for Boston, New Orleans and Montgomery County (Jurisdiction[Units Published] false; Montgomery's file carries a 1-per-house proxy that misses multifamily).
 	column 'Housing Units Contribution'
 		isAvailableInMdx: false
 		dataType: int64
@@ -215,6 +215,8 @@ table 'Fact Permit'
 				let
 					Raw = Parquet.Document(PermitFiles{[Name = "permits.parquet"]}[Content]),
 					Renamed = Table.RenameColumns(Raw, {{"permit_key", "Permit Key"}, {"jurisdiction", "Jurisdiction"}, {"category_key", "Category Key"}, {"work_class", "Work Class"}, {"use_class", "Use Class"}, {"status", "Status"}, {"applied_date", "Applied Date"}, {"issued_date", "Issued Date"}, {"final_date", "Final Date"}, {"units_added", "Units Added"}, {"housing_units", "Housing Units Contribution"}, {"valuation_usable", "Valuation Usable"}, {"days_apply_to_issue", "Days Apply To Issue"}}),
-					Typed = Table.TransformColumnTypes(Renamed, {{"Permit Key", type text}, {"Jurisdiction", type text}, {"Category Key", type text}, {"Work Class", type text}, {"Use Class", type text}, {"Status", type text}, {"Applied Date", type date}, {"Issued Date", type date}, {"Final Date", type date}, {"Units Added", Int64.Type}, {"Housing Units Contribution", Int64.Type}, {"Valuation Usable", Currency.Type}, {"Days Apply To Issue", Int64.Type}})
+					Typed = Table.TransformColumnTypes(Renamed, {{"Permit Key", type text}, {"Jurisdiction", type text}, {"Category Key", type text}, {"Work Class", type text}, {"Use Class", type text}, {"Status", type text}, {"Applied Date", type date}, {"Issued Date", type date}, {"Final Date", type date}, {"Units Added", Int64.Type}, {"Housing Units Contribution", Int64.Type}, {"Valuation Usable", Currency.Type}, {"Days Apply To Issue", Int64.Type}}),
+					NoUnits = {"Boston, MA", "New Orleans, LA", "Montgomery County, MD"},
+					UnitsPublished = Table.ReplaceValue(Typed, each [Housing Units Contribution], each if List.Contains(NoUnits, [Jurisdiction]) then null else [Housing Units Contribution], Replacer.ReplaceValue, {"Housing Units Contribution"})
 				in
-					Typed
+					UnitsPublished

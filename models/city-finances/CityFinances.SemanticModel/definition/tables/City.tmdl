@@ -1,4 +1,4 @@
-/// The 59 cities attempted (the 50 largest US cities by Census Vintage 2024 population plus ten Washington cities near Bellevue; Seattle is in both), 54 of them in the data. In Data is false for New York, Philadelphia, Miami, Kent and Bothell (reports with image or unreadable tables; the factory's MISSING.md). Table Sums OK is false for the 8 cities whose extracted lines don't all add to the table totals: use their totals, not their lines.
+/// The 59 cities attempted (the 50 largest US cities by Census Vintage 2024 population plus ten Washington cities near Bellevue; Seattle is in both lists and its City Group is Top 50 US city), 54 of them in the data. In Data is false for New York, Philadelphia, Miami, Kent and Bothell (reports with image or unreadable tables; the factory's MISSING.md). Table Sums OK is false for the 8 cities whose extracted lines don't all add to the table totals: use their totals, not their lines.
 table City
 
 	/// 7-digit Census FIPS place code (state 2 + place 5). Primary key.
@@ -27,7 +27,7 @@ table City
 		summarizeBy: none
 		sourceColumn: Population
 
-	/// Top 50 US city or Washington near Bellevue.
+	/// Top 50 US city or Washington near Bellevue. One group per city: Seattle, on both lists, is Top 50 US city, so Washington near Bellevue is the nine smaller cities (seven in the data).
 	column 'City Group'
 		dataType: string
 		summarizeBy: none

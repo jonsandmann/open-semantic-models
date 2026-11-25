@@ -51,7 +51,7 @@ Ossie relationships are many-to-one joins with no active flag and no cross-filte
 | Units in 200+ Permits | Ports as SQL | `SUM(housing_units_contribution) FILTER (WHERE units_added >= 200)` |
 | Share of Units in 200+ Permits | Ports as SQL | `SUM(housing_units_contribution) FILTER (WHERE units_added >= 200) / NULLIF(SUM(housing_units_contribution), 0)` |
 | Median Days Apply to Issue | Ports as SQL | `MEDIAN(days_apply_to_issue)` |
-| Same-Day Issue Share | Ports as SQL | `COUNT(*) FILTER (WHERE COALESCE(days_apply_to_issue, 0) = 0) / NULLIF(COUNT(*) FILTER (WHERE days_apply_to_issue IS NOT NULL), 0)` |
+| Same-Day Issue Share | Ports as SQL | `COUNT(*) FILTER (WHERE days_apply_to_issue = 0) / NULLIF(COUNT(*) FILTER (WHERE days_apply_to_issue IS NOT NULL), 0)`. The DAX compares with `==` (fixed 25 Nov 2026; `= 0` was true for blank), so a null day-count is in neither side, as SQL `= 0` drops it. The DAX numerator is `COALESCE(..., 0)`, the 0 that `COUNT(*)` returns. |
 | Valuation USD | Ports as SQL | `SUM(valuation_usable)` |
 | New Construction Valuation | Ports as SQL | `SUM(valuation_usable) FILTER (WHERE category_key IN ('new_residential', 'new_nonresidential'))`. `Category[Work Class] = "new"` holds for exactly these two category keys (the Category table's own M), and the fact carries `category_key`. |
 | Last Issue Date | Ports as SQL | `MAX(issued_date)` |

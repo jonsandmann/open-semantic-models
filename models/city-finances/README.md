@@ -85,6 +85,10 @@ No incremental refresh (3,751 rows; TmdlCheck's PRF3 warning, accepted).
 | Shares | Share of Total Expenses, Share of Total Revenues, Property Tax Share of Revenues, Business-Type Share of Expenses |
 | Per Resident | Revenues per Resident, Expenses per Resident, Net Position per Resident, Unrestricted Net Position per Resident, Net Pension Liability per Resident, Years per City |
 | Time | Total Revenues Prior Year, Revenue Growth %, Total Expenses Prior Year, Expense Growth % |
+
+The prior-year measures read each city's fiscal year from its own figures, so `Year Position = Latest` alone gives
+every city's growth on its latest report (54 cities: revenues +3.7%, expenses +2.8%); growth counts only cities with
+both years. Before 25 Nov they needed one `Fiscal Year End[Year]` in context and went blank on Latest alone.
 | Coverage | Figures Read, Cities Reporting, Hand-Checked Figures, Cities with Sums OK, Cities with Negative Unrestricted Net Position |
 | About | Attribution |
 
@@ -122,7 +126,7 @@ moved; the Fabric run below was on the earlier read.
 | 7 | Phoenix FY2025 public safety share of total expenses | 30.7% |
 | 8 | Seattle FY2025 business-type share of expenses | 43.4% |
 | 9 | Latest report: net pension liability, cities, per resident | $37,836.47M; 19; $2,510.58 |
-| 10 | Washington cities near Bellevue, latest: cities, property tax share of revenues | 8; 11.9% |
+| 10 | Washington cities near Bellevue, latest: cities, property tax share of revenues | 7; 7.1% (was 8; 11.9% while `prep.py` put Seattle in this group, fixed 25 Nov) |
 
 ## Validation
 
@@ -134,3 +138,8 @@ know `ADDCOLUMNS` columns, so the per-resident measures iterate the City table i
 `Files/cities/`; `fab import` as "City Finances (ACFR)"; OAuth2 on the OneLake source; full refresh **Completed in
 5 s**. `tests/checks.dax` **10/10**; all 31 measures evaluate; zero orphan keys. Capacity paused; `az rest`
 `properties.state` = `Paused`.
+
+**Redeployed 25 Nov 2026 (15:57 UTC)** on the run-4 Parquet with the fixes (per-city prior year; Seattle in Top 50
+US city): Parquet re-copied to `Files/cities/`, `fab import -f`, OAuth2 re-set, full refresh 25 s. `tests/checks.dax`
+**10/10** on the README's current answers (Q10 is now 7 cities, 7.1%: the old 8 / 11.9% counted Seattle) plus check
+11 (Year Position = Latest alone: revenue growth +3.68%, expense growth +2.83%). Capacity paused (`Paused`).

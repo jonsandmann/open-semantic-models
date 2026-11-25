@@ -78,6 +78,14 @@ ROW (
     "a2026", CALCULATE ( [Applications], Jurisdiction[Jurisdiction] = "Seattle, WA", Category[Category Key] = "new_residential", DATESBETWEEN ( 'Apply Date'[Date], DATE ( 2026, 1, 1 ), DATE ( 2026, 10, 31 ) ) )
 )
 
+-- Regression: same-day issue share, issue year 2025, Los Angeles (0.1283; was 0.79 when blank day-counts read as 0)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "same_day", [Same-Day Issue Share] ),
+    Jurisdiction[Jurisdiction] = "Los Angeles, CA",
+    'Issue Date'[Year] = 2025
+)
+
 -- All measures evaluate with no filter
 EVALUATE
 ROW (
@@ -89,6 +97,7 @@ ROW (
     "Median Days Apply to Issue", [Median Days Apply to Issue],
     "Same-Day Issue Share", [Same-Day Issue Share],
     "Valuation USD", [Valuation USD],
+    "Last Issue Date", [Last Issue Date],
     "New Construction Valuation", [New Construction Valuation],
     "Permits Prior Year", [Permits Prior Year],
     "Permits YoY %", [Permits YoY %],

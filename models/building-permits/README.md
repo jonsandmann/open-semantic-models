@@ -28,7 +28,10 @@ and include Los Angeles mixed-use apartments that the crosswalk filed as commerc
   (2023–2025), near the red team's 10.7.
 - **Los Angeles mixed-use apartments** (`Bldg-New | Commercial | Apartment` and similar) sit in
   `new_nonresidential` in the join; `Housing Units` still counts them. That closes LA's gap to BPS.
-- **Boston, New Orleans and Montgomery County** publish no usable unit counts; per-capita measures are blank.
+- **Boston, New Orleans and Montgomery County** publish no usable unit counts; `Housing Units` and the per-capita
+  measures are blank for them. Montgomery's file carries a 1-per-house proxy (every new single-family or townhouse
+  permit = 1, multifamily = nothing; 3,690 units 2023–2026, max 1 per permit); the model blanks it in Power Query
+  so the data agrees with `Units Published` = false.
 - **Valuation** is self-declared. Austin's field is unusable (copied onto trades); Philadelphia publishes none;
   NYC has $1,000 placeholders. `Valuation USD` drops Austin and values outside 1 .. $2 billion.
 - **2026 is year-to-date** (to ~23 Nov). Chicago's unit field goes blank after 30 Sep 2026. Seattle's 2026
@@ -77,7 +80,7 @@ volume measures follow Issue Date.
 
 No incremental refresh: the factory rebuilds the whole snapshot.
 
-## Measures (16)
+## Measures (17)
 
 | Folder | Measures |
 |---|---|
@@ -85,11 +88,13 @@ No incremental refresh: the factory rebuilds the whole snapshot.
 | Housing | Housing Units, Housing Units per 1,000 per Year, Units in 200+ Permits, Share of Units in 200+ Permits |
 | Speed | Median Days Apply to Issue, Same-Day Issue Share |
 | Value | Valuation USD, New Construction Valuation |
-| Time | Permits Prior Year, Permits YoY %, Housing Units Prior Year, Housing Units YoY % |
+| Time | Last Issue Date (helper), Permits Prior Year, Permits YoY %, Housing Units Prior Year, Housing Units YoY % |
 | Pipeline | Applications, Finaled Permits |
 | About | Attribution |
 
-`Housing Units per 1,000 per Year` is blank unless exactly one jurisdiction is in context.
+`Housing Units per 1,000 per Year` is blank unless exactly one jurisdiction is in context. `Same-Day Issue Share`
+compares with `==` (in DAX `BLANK = 0` is true), so permits without both dates are in neither side: Los Angeles
+2025 is 12.8% (it read 79% before the 25 Nov fix).
 
 ## Ten business questions (acceptance checks)
 
@@ -97,7 +102,7 @@ Expected answers were computed first from the Parquet files with duckdb (`tests/
 
 | # | Question | Expected (duckdb) |
 |---|---|---|
-| 1 | How much is loaded? | 1,519,874 permits; 248,340 housing units (contribution) |
+| 1 | How much is loaded? | 1,519,874 permits; 244,650 housing units (contribution; 248,340 before Montgomery's proxy was dropped, 25 Nov) |
 | 2 | Austin homes per 1,000 residents per year, issue 2023–2025 | 10.43 (31,080 units / 3 / 993,588 × 1000) |
 | 3 | Median days apply→issue, new residential, issue year 2025 | Montgomery County 58; San Francisco 648 (647.5) |
 | 4 | NYC housing units issued Jan–Oct 2026 vs 2025 | 24,662 vs 12,837 (**+92%**) |
@@ -116,3 +121,8 @@ Expected answers were computed first from the Parquet files with duckdb (`tests/
 `permits.parquet` in `Files/permits/`; `fab import`; OAuth2; full refresh **Completed in 47 s**. First attempt with
 the 63 MB factory file plus a NestedJoin hit the F2 3 GB cap. `tests/checks.dax` **10/10**; all 17 measures
 evaluate. Capacity paused; `az rest` `properties.state` = `Paused`.
+
+**Redeployed 25 Nov 2026 (16:00 UTC) with the bug fixes** (`Same-Day Issue Share` uses `==`; housing units blank
+where `Units Published` is false): `fab import -f`, OAuth2 re-set on the OneLake source, full refresh 2 min 11 s.
+`tests/checks.dax` **10/10** (Q1 now 244,650 units: the old 248,340 included Montgomery's proxy) plus the same-day
+regression (Los Angeles 2025: 0.1283); all 17 measures evaluate. Capacity paused (`Paused`).
