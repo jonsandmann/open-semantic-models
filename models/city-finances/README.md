@@ -1,11 +1,11 @@
 # City Finances from audited ACFRs (54 US cities)
 
 A semantic model of US city finances read by our own data factory from each city's audited Annual Comprehensive
-Financial Report (ACFR): the 50 largest US cities plus ten Washington cities near Bellevue, 54 of them read. 3,717
+Financial Report (ACFR): the 50 largest US cities plus ten Washington cities near Bellevue, 54 of them read. 3,751
 figures, each city's latest posted fiscal year (FY2025 for 52, FY2024 for Bakersfield and Redmond) and the prior
 year from the same report's comparative column. **Every figure cites its PDF and page**, so any number in a report
 built on this model can be checked against the audited statement. On their latest reports the 54 cities spent
-$181.5 billion, $4,352 per resident, and 34 of them carry a negative unrestricted net position.
+$184.5 billion, $4,424 per resident, and 33 of them carry a negative unrestricted net position.
 
 ## Source
 
@@ -27,7 +27,7 @@ $181.5 billion, $4,352 per resident, and 34 of them carry a negative unrestricte
   count only the cities that report the figure.
 - **Totals are comparable; lines need care.** Function lines are mapped by label synonyms (SF's "Public
   protection", Virginia Beach's department-named functions and airports, transit and ports land in `exp_other` with
-  their label in `Source Label`). 8 of 54 cities fail a sum check (`City[Table Sums OK]`): use their totals, not
+  their label in `Source Label`). 7 of 54 cities fail a sum check (`City[Table Sums OK]`): use their totals, not
   their lines.
 - **The reporting entity differs.** Some cities hold an airport or utilities as business-type activities (Seattle
   City Light: 43% of Seattle's expenses); others don't. `Business-Type Share of Expenses` shows how much. San
@@ -46,7 +46,7 @@ $181.5 billion, $4,352 per resident, and 34 of them carry a negative unrestricte
 
 | Fact | Grain | Rows |
 |---|---|---|
-| Fact Figure | one city x fiscal year x figure (several `*_other` lines per city-year, by label) | 3,717 |
+| Fact Figure | one city x fiscal year x figure (several `*_other` lines per city-year, by label) | 3,751 |
 
 ## Star schema
 
@@ -60,7 +60,7 @@ Every relationship is many-to-one, single direction; one marked date table (fisc
 
 | Table | Rows | Key | Visible attributes |
 |---|---|---|---|
-| Fact Figure | 3,717 | Row ID | measures only (page and extraction method kept, hidden) |
+| Fact Figure | 3,751 | Row ID | measures only (page and extraction method kept, hidden) |
 | City | 59 | City Key (FIPS place) | City, State, Population, City Group, In Data, Table Sums OK |
 | Figure | 43 | Figure ID | Figure Label (statement order), Statement, Section |
 | Report | 108 | Report Key | Report Fiscal Year End, Source PDF (web URL) |
@@ -75,7 +75,7 @@ Every relationship is many-to-one, single direction; one marked date table (fisc
 | `FinanceFiles` | shared, not loaded | `AzureStorage.DataLake ( FinancesFolder )` |
 | `Calendar` | shared, not loaded | 2023-01-01 to 2025-12-31 |
 
-No incremental refresh (3,717 rows; TmdlCheck's PRF3 warning, accepted).
+No incremental refresh (3,751 rows; TmdlCheck's PRF3 warning, accepted).
 
 ## Measures (31)
 
@@ -105,16 +105,20 @@ grand total they are meaningless.
 
 ## Ten business questions (acceptance checks)
 
-Expected answers computed first from the factory's `city_finances.csv` with duckdb (`tests/expected.py`).
+Expected answers computed first from the factory's `city_finances.csv` with duckdb (`tests/expected.py`). Recomputed
+25 Nov 2026 after the factory's run-4 fix: Charlotte's government-wide figures had been read 1,000× too small (its
+MD&A states "Dollar Amounts in Millions" once, above the tables), Oklahoma City's total assets and liabilities were a
+change column, and Chicago's net position rows (from the enterprise funds' statement) are left out. Q1, Q3 and Q6
+moved; the Fabric run below was on the earlier read.
 
 | # | Question | Expected (duckdb) |
 |---|---|---|
-| 1 | How much is loaded? | 3,717 figures; 54 cities; 30 hand-checked; 46 pass every sum check |
+| 1 | How much is loaded? | 3,751 figures; 54 cities; 30 hand-checked; 47 pass every sum check |
 | 2 | Seattle FY2025 revenues, expenses, net position | $6,275.0M; $5,573.59M; $10,362.0M |
-| 3 | Every city on its latest report: expenses, cities, per resident | $181,534.55M; 54; **$4,351.71** |
+| 3 | Every city on its latest report: expenses, cities, per resident | $184,539.64M; 54; **$4,423.75** |
 | 4 | San Francisco FY2025 expenses per resident | $18,465.67 |
 | 5 | Los Angeles total revenues FY2025 vs FY2024 | $24,276.13M vs $21,851.11M (**+11.1%**) |
-| 6 | Latest report: cities with negative unrestricted net position; lowest | **34**; Dallas -$4,893.45M |
+| 6 | Latest report: cities with negative unrestricted net position; lowest | **33**; Dallas -$4,893.45M |
 | 7 | Phoenix FY2025 public safety share of total expenses | 30.7% |
 | 8 | Seattle FY2025 business-type share of expenses | 43.4% |
 | 9 | Latest report: net pension liability, cities, per resident | $37,836.47M; 19; $2,510.58 |
