@@ -1,0 +1,28 @@
+model Model
+	culture: en-GB
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-GB
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation Attribution = Contains HM Land Registry data © Crown copyright and database right 2026. This data is licensed under the Open Government Licence v3.0.
+
+annotation PBI_QueryOrder = ["PricePaidUrl","CalendarStart","CalendarEnd","PricePaid","Fact Sale","Location","Property Type","Duration","Build","Category","Record Status","Date"]
+
+ref table 'Fact Sale'
+ref table Location
+ref table 'Property Type'
+ref table Duration
+ref table Build
+ref table Category
+ref table 'Record Status'
+ref table Date
+
+ref expression PricePaidUrl
+ref expression CalendarStart
+ref expression CalendarEnd
+ref expression PricePaid

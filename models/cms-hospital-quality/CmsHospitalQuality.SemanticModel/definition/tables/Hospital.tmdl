@@ -1,0 +1,111 @@
+/// Hospital dimension, one row per facility in CMS Hospital General Information for the current catalog release (all hospital types: acute care, critical access, psychiatric, VA, children's, DoD, cancer, long-term, rural emergency). Address and telephone are the hospital's published Care Compare contact fields, not patient data; they are hidden, so keep them off visuals that do not need them. State is folded in (no separate State table).
+table Hospital
+
+	/// Hospitals in the Hospital table that match the Hospital filters (type, state, ownership...), whatever their rating or reporting. A count of the dimension: Performance Date, Release Date and Quality Measure slicers do not change it, because every relationship filters from dimension to fact. For hospitals that reported in a period or on a measure use Hospitals with a result; for rated hospitals use Hospitals rated.
+	measure Hospitals = COUNTROWS ( Hospital )
+		formatString: #,0
+		displayFolder: Hospital
+
+	/// Hospitals that meet CMS's birthing-friendly designation criteria (Birthing Friendly = "Y"). A count of the dimension, like Hospitals: date and measure slicers do not change it.
+	measure 'Birthing friendly hospitals' = CALCULATE ( COUNTROWS ( Hospital ), KEEPFILTERS ( Hospital[Birthing Friendly] = "Y" ) )
+		formatString: #,0
+		displayFolder: Hospital
+
+	/// Six-character CMS Certification Number (CCN) of the facility, text with leading zeros kept (for example 010001). Primary key.
+	column 'Facility ID'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Facility ID
+
+	/// Facility name as CMS publishes it (upper case).
+	column 'Facility Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Facility Name
+
+	/// CMS hospital type: Acute Care Hospitals, Critical Access Hospitals, Psychiatric, Acute Care - Veterans Administration, Childrens, Rural Emergency Hospital, Acute Care - Department of Defense, Dedicated Cancer Care, Long-term.
+	column 'Hospital Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Hospital Type
+
+	/// Ownership as CMS publishes it, for example Voluntary non-profit - Private or Government - Hospital District or Authority.
+	column 'Hospital Ownership'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Hospital Ownership
+
+	/// Whether the hospital provides emergency services: Yes or No.
+	column 'Emergency Services'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Emergency Services
+
+	/// Y when the hospital meets CMS's criteria for the birthing-friendly designation; blank otherwise (blank is not "No data", it means the criteria are not met or not reported).
+	column 'Birthing Friendly'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Birthing Friendly
+
+	/// Published street address of the facility. Hidden: keep off reports unless a visual needs it.
+	column Address
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Address
+
+	/// City or town of the facility.
+	column City
+		dataType: string
+		dataCategory: City
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Five-digit ZIP code, text with leading zeros kept.
+	column 'ZIP Code'
+		dataType: string
+		dataCategory: PostalCode
+		summarizeBy: none
+		sourceColumn: ZIP Code
+
+	/// County or parish of the facility.
+	column County
+		dataType: string
+		dataCategory: County
+		summarizeBy: none
+		sourceColumn: County
+
+	/// Published main telephone number of the facility. Hidden: keep off reports unless a visual needs it.
+	column Telephone
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Telephone
+
+	/// Two-letter USPS code of the state or territory (50 states, DC, PR, GU, VI, AS, MP).
+	column 'State Code'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: State Code
+
+	/// Name of the state or territory, for example California or Puerto Rico.
+	column 'State Name'
+		dataType: string
+		dataCategory: StateOrProvince
+		summarizeBy: none
+		sourceColumn: State Name
+
+	partition Hospital = m
+		mode: import
+		source =
+			let
+				Source = GeneralInformation,
+				Keep = Table.SelectColumns(Source, {"Facility ID", "Facility Name", "Address", "City/Town", "State", "ZIP Code", "County/Parish", "Telephone Number", "Hospital Type", "Hospital Ownership", "Emergency Services", "Meets criteria for birthing friendly designation"}),
+				Renamed = Table.RenameColumns(Keep, {{"City/Town", "City"}, {"State", "State Code"}, {"County/Parish", "County"}, {"Telephone Number", "Telephone"}, {"Meets criteria for birthing friendly designation", "Birthing Friendly"}}),
+				// USPS names for the 56 codes in the file; an unknown code keeps the code as its name rather than failing.
+				Names = [AK = "Alaska", AL = "Alabama", AR = "Arkansas", AS = "American Samoa", AZ = "Arizona", CA = "California", CO = "Colorado", CT = "Connecticut", DC = "District of Columbia", DE = "Delaware", FL = "Florida", GA = "Georgia", GU = "Guam", HI = "Hawaii", IA = "Iowa", ID = "Idaho", IL = "Illinois", IN = "Indiana", KS = "Kansas", KY = "Kentucky", LA = "Louisiana", MA = "Massachusetts", MD = "Maryland", ME = "Maine", MI = "Michigan", MN = "Minnesota", MO = "Missouri", MP = "Northern Mariana Islands", MS = "Mississippi", MT = "Montana", NC = "North Carolina", ND = "North Dakota", NE = "Nebraska", NH = "New Hampshire", NJ = "New Jersey", NM = "New Mexico", NV = "Nevada", NY = "New York", OH = "Ohio", OK = "Oklahoma", OR = "Oregon", PA = "Pennsylvania", PR = "Puerto Rico", RI = "Rhode Island", SC = "South Carolina", SD = "South Dakota", TN = "Tennessee", TX = "Texas", UT = "Utah", VA = "Virginia", VI = "U.S. Virgin Islands", VT = "Vermont", WA = "Washington", WI = "Wisconsin", WV = "West Virginia", WY = "Wyoming"],
+				WithState = Table.AddColumn(Renamed, "State Name", each Record.FieldOrDefault(Names, [State Code], [State Code]), type text),
+				Typed = Table.TransformColumnTypes(WithState, {{"Facility ID", type text}, {"Facility Name", type text}, {"Address", type text}, {"City", type text}, {"State Code", type text}, {"ZIP Code", type text}, {"County", type text}, {"Telephone", type text}, {"Hospital Type", type text}, {"Hospital Ownership", type text}, {"Emergency Services", type text}, {"Birthing Friendly", type text}})
+			in
+				Typed

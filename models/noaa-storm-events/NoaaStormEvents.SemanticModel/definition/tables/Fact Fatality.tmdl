@@ -1,0 +1,65 @@
+/// Fact table: NOAA Storm Events fatalities file, one row per fatality id (a person who died), from the latest vintage of each data year loaded. Who died, when, where and whether the death was direct. It is not a second copy of the event death counts: the two files disagree slightly (2025: 932 fatality rows, 926 deaths on event rows), and the model never adds them. Filters reach the event's state and type through the one-way link to Fact Event.
+table 'Fact Fatality'
+
+	/// People in the fatalities file. Read apart from Deaths (the event rows' counts); never add the two.
+	measure 'Fatality records' = COUNTROWS ( 'Fact Fatality' )
+		formatString: #,0
+		displayFolder: Fatality file
+
+	/// Fatality records whose type is Direct.
+	measure 'Direct fatality records' = CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Direct" ) )
+		formatString: #,0
+		displayFolder: Fatality file
+
+	/// Fatality records whose type is Indirect.
+	measure 'Indirect fatality records' = CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Indirect" ) )
+		formatString: #,0
+		displayFolder: Fatality file
+
+	/// Median age of the people in the fatality records in context that have an age.
+	measure 'Median age at death' = MEDIAN ( 'Fact Fatality'[Age] )
+		formatString: 0
+		displayFolder: Fatality file
+
+	/// NOAA's fatality id. One row per id.
+	column 'Fatality ID'
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Fatality ID
+
+	/// Event the death is attached to. Foreign key to 'Fact Event'[Event ID] (one way: the event's state, type and begin date filter fatalities; fatalities do not filter events).
+	column 'Event ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Event ID
+
+	/// Day the person died. Foreign key to 'Fatality Date'[Date].
+	column 'Fatality Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Fatality Date
+
+	/// Fatality type, location and sex joined with "|". Foreign key to 'Fatality Profile'[Profile Key].
+	column 'Profile Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Profile Key
+
+	/// Age in years. Blank when not recorded.
+	column Age
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Age
+
+	partition 'Fact Fatality' = m
+		mode: import
+		source = Table.SelectColumns(StormFatalities, {"Fatality ID", "Event ID", "Fatality Date", "Profile Key", "Age"})

@@ -1,0 +1,22 @@
+/// First visit or follow-up: a follow-up is an inspection within 60 days of an earlier visit (of any type, on an earlier date) to the same establishment. Boston and Toronto publish no inspection type, so their follow-ups sit inside Routine; filter to First visit to compare like with like (Boston's published fail rate is 40% on all routine visits and 61% on first visits).
+table 'Visit Kind'
+
+	/// 1 first visit, 2 follow-up within 60 days. Primary key, related to 'Fact Inspection'[Visit Kind Key].
+	column 'Visit Kind Key'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Visit Kind Key
+
+	/// First visit, or Follow-up within 60 days. Sorted by Visit Kind Key.
+	column 'Visit Kind'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Visit Kind
+		sortByColumn: 'Visit Kind Key'
+
+	partition 'Visit Kind' = m
+		mode: import
+		source = #table(type table [Visit Kind Key = Int64.Type, Visit Kind = text], {{1, "First visit"}, {2, "Follow-up within 60 days"}})

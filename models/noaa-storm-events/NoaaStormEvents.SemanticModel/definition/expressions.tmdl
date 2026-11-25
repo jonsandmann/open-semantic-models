@@ -1,0 +1,137 @@
+/// NOAA NCEI Storm Events bulk CSV directory (public domain, no key). The one Web data source: every file is read with RelativePath from this root, which answers 200 to the service's credential test.
+expression StormEventsBaseUrl = "https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// First data year to load (the d year in the file name, which is the year the event began). Default 2024, so 2025 has a prior year to compare with.
+expression FirstYear = 2024 meta [IsParameterQuery = true, Type = "Number", IsParameterQueryRequired = true]
+
+/// Last data year to load. Default 2025, the latest full year. The index also holds a partial current year (d2026); loading it gives a year in progress, which the year-to-date and prior-year measures handle.
+expression LastYear = 2025 meta [IsParameterQuery = true, Type = "Number", IsParameterQueryRequired = true]
+
+/// Shared query, not loaded: the files to read. Lists the bulk directory, keeps the details and fatalities file names for FirstYear to LastYear, and keeps only the greatest creation date (the c part of the name) per table and data year. NOAA leaves superseded vintages of a year in the index; reading them too would count the year two or three times.
+expression LatestFiles =
+		let
+			Page = Text.FromBinary(Web.Contents(StormEventsBaseUrl), TextEncoding.Utf8),
+			Tokens = List.Distinct(Text.SplitAny(Page, " ""<>")),
+			// The data year follows "_v1.0_d" (a bare "_d" would match "_details"); the creation date follows the last "_c".
+			Names = List.Select(Tokens, each Text.StartsWith(_, "StormEvents_") and Text.EndsWith(_, ".csv.gz") and Text.Contains(_, "-ftp_v1.0_d")),
+			Parsed = List.Transform(Names, each [
+				Name = _,
+				Kind = Text.BetweenDelimiters(_, "StormEvents_", "-ftp"),
+				Year = Number.FromText(Text.Middle(_, Text.PositionOf(_, "_v1.0_d") + 7, 4)),
+				Built = Text.Middle(_, Text.PositionOf(_, "_c", Occurrence.Last) + 2, 8)
+			]),
+			AsTable = Table.FromRecords(Parsed, type table [Name = text, Kind = text, Year = number, Built = text]),
+			Wanted = Table.SelectRows(AsTable, each List.Contains({"details", "fatalities"}, [Kind]) and [Year] >= FirstYear and [Year] <= LastYear),
+			Latest = Table.Group(Wanted, {"Kind", "Year"}, {{"Name", each Table.Max(_, "Built")[Name], type text}, {"Built", each List.Max([Built]), type text}})
+		in
+			Latest
+	annotation PBI_ResultType = Table
+
+/// Shared query, not loaded: the Storm Events details files (one row per event id) for the years in LatestFiles, with the columns the model uses parsed and typed. Narratives, azimuths, coordinates and the locations file are never read; summing damage over the locations file would multiply it. Feeds Fact Event, State and Event Type.
+expression StormDetails =
+		let
+			Files = Table.SelectRows(LatestFiles, each [Kind] = "details"),
+			ReadOne = (file as text, built as text) as table =>
+				let
+					Csv = Csv.Document(Binary.Decompress(Web.Contents(StormEventsBaseUrl, [RelativePath = file]), Compression.GZip), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+					Promoted = Table.PromoteHeaders(Csv, [PromoteAllScalars = true]),
+					Kept = Table.SelectColumns(Promoted, {"BEGIN_YEARMONTH", "BEGIN_DAY", "END_YEARMONTH", "END_DAY", "EPISODE_ID", "EVENT_ID", "STATE", "STATE_FIPS", "EVENT_TYPE", "CZ_TYPE", "CZ_NAME", "INJURIES_DIRECT", "INJURIES_INDIRECT", "DEATHS_DIRECT", "DEATHS_INDIRECT", "DAMAGE_PROPERTY", "DAMAGE_CROPS", "MAGNITUDE", "TOR_F_SCALE", "TOR_LENGTH", "TOR_WIDTH"}),
+					WithBuilt = Table.AddColumn(Kept, "File Built", each Date.FromText(built, [Format = "yyyyMMdd", Culture = "en-US"]), type date)
+				in
+					WithBuilt,
+			Stacked = Table.Combine(List.Transform(Table.ToRecords(Files), each ReadOne([Name], [Built]))),
+			// Blank stays null (not zero); numbers are plain US-format text.
+			Num = (t as nullable text) as nullable number => if t = null or Text.Trim(t) = "" then null else Number.FromText(Text.Trim(t), "en-US"),
+			// Damage is text with a K, M, B (or H) suffix: 1.00K = 1,000; 1.60B = 1,600,000,000. Blank is null, never zero.
+			Dollars = (t as nullable text) as nullable number =>
+				let
+					s = if t = null then "" else Text.Upper(Text.Trim(t)),
+					Last = if s = "" then "" else Text.End(s, 1),
+					Mult = if Last = "K" then 1000 else if Last = "M" then 1000000 else if Last = "B" then 1000000000 else if Last = "H" then 100 else 1,
+					Digits = if List.Contains({"K", "M", "B", "H"}, Last) then Text.Start(s, Text.Length(s) - 1) else s
+				in
+					if s = "" then null else (if Digits = "" then 0 else Number.FromText(Digits, "en-US")) * Mult,
+			// Dates from the year-month and day columns, which avoids the two-digit year in BEGIN_DATE_TIME.
+			DayOf = (ym as text, d as text) as date => #date(Number.FromText(Text.Start(ym, 4)), Number.FromText(Text.End(ym, 2)), Number.FromText(d)),
+			Shaped = Table.FromRecords(Table.TransformRows(Stacked, (r) => [
+				Event ID = r[EVENT_ID],
+				Episode ID = r[EPISODE_ID],
+				Begin Date = DayOf(r[BEGIN_YEARMONTH], r[BEGIN_DAY]),
+				End Date = DayOf(r[END_YEARMONTH], r[END_DAY]),
+				State = Text.Trim(r[STATE]),
+				State FIPS = Num(r[STATE_FIPS]),
+				Event Type = Text.Trim(r[EVENT_TYPE]),
+				CZ Type = r[CZ_TYPE],
+				CZ Name = r[CZ_NAME],
+				Property Damage USD = Dollars(r[DAMAGE_PROPERTY]),
+				Crop Damage USD = Dollars(r[DAMAGE_CROPS]),
+				Deaths Direct = Num(r[DEATHS_DIRECT]),
+				Deaths Indirect = Num(r[DEATHS_INDIRECT]),
+				Injuries Direct = Num(r[INJURIES_DIRECT]),
+				Injuries Indirect = Num(r[INJURIES_INDIRECT]),
+				Tornado Scale = if r[TOR_F_SCALE] = null or Text.Trim(r[TOR_F_SCALE]) = "" then "None" else Text.Trim(r[TOR_F_SCALE]),
+				Tornado Length Miles = Num(r[TOR_LENGTH]),
+				Tornado Width Yards = Num(r[TOR_WIDTH]),
+				Magnitude = Num(r[MAGNITUDE]),
+				File Built = r[File Built]
+			])),
+			Typed = Table.TransformColumnTypes(Shaped, {
+				{"Event ID", type text}, {"Episode ID", type text}, {"Begin Date", type date}, {"End Date", type date},
+				{"State", type text}, {"State FIPS", Int64.Type}, {"Event Type", type text}, {"CZ Type", type text}, {"CZ Name", type text},
+				{"Property Damage USD", Currency.Type}, {"Crop Damage USD", Currency.Type},
+				{"Deaths Direct", Int64.Type}, {"Deaths Indirect", Int64.Type}, {"Injuries Direct", Int64.Type}, {"Injuries Indirect", Int64.Type},
+				{"Tornado Scale", type text}, {"Tornado Length Miles", Currency.Type}, {"Tornado Width Yards", Int64.Type}, {"Magnitude", Currency.Type},
+				{"File Built", type date}
+			})
+		in
+			Typed
+	annotation PBI_ResultType = Table
+
+/// Shared query, not loaded: one calendar day per row from 1 January FirstYear to 31 December LastYear, with year, quarter and month labels. Date, End Date and Fatality Date each load this one query (three role-playing date tables, no extra download).
+expression Calendar =
+		let
+			CalendarStart = #date(FirstYear, 1, 1),
+			CalendarEnd = #date(LastYear, 12, 31),
+			DayCount = Duration.Days(CalendarEnd - CalendarStart) + 1,
+			Dates = List.Dates(CalendarStart, DayCount, #duration(1, 0, 0, 0)),
+			Base = Table.FromList(Dates, Splitter.SplitByNothing(), type table [Date = date]),
+			AddYear = Table.AddColumn(Base, "Year", each Date.Year([Date]), Int64.Type),
+			AddQuarterNumber = Table.AddColumn(AddYear, "Quarter Number", each Date.QuarterOfYear([Date]), Int64.Type),
+			AddQuarter = Table.AddColumn(AddQuarterNumber, "Quarter", each "Q" & Text.From([Quarter Number]), type text),
+			AddYearQuarter = Table.AddColumn(AddQuarter, "Year Quarter", each Text.From([Year]) & " Q" & Text.From([Quarter Number]), type text),
+			AddYearQuarterNumber = Table.AddColumn(AddYearQuarter, "Year Quarter Number", each [Year] * 10 + [Quarter Number], Int64.Type),
+			AddMonthNumber = Table.AddColumn(AddYearQuarterNumber, "Month Number", each Date.Month([Date]), Int64.Type),
+			AddMonth = Table.AddColumn(AddMonthNumber, "Month", each Date.ToText([Date], [Format = "MMMM", Culture = "en-US"]), type text),
+			AddMonthShort = Table.AddColumn(AddMonth, "Month Short", each Date.ToText([Date], [Format = "MMM", Culture = "en-US"]), type text),
+			AddYearMonth = Table.AddColumn(AddMonthShort, "Year Month", each Text.From([Year]) & "-" & Text.PadStart(Text.From([Month Number]), 2, "0"), type text),
+			AddYearMonthSort = Table.AddColumn(AddYearMonth, "Year Month Sort", each [Year] * 100 + [Month Number], Int64.Type),
+			AddMonthStart = Table.AddColumn(AddYearMonthSort, "Month Start", each Date.StartOfMonth([Date]), type date)
+		in
+			AddMonthStart
+	annotation PBI_ResultType = Table
+
+/// Shared query, not loaded: the Storm Events fatalities files (one row per fatality id, the person who died) for the years in LatestFiles. The file has no damage columns. Feeds Fact Fatality and Fatality Profile.
+expression StormFatalities =
+		let
+			Files = Table.SelectRows(LatestFiles, each [Kind] = "fatalities"),
+			ReadOne = (file as text) as table =>
+				let
+					Csv = Csv.Document(Binary.Decompress(Web.Contents(StormEventsBaseUrl, [RelativePath = file]), Compression.GZip), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+					Promoted = Table.PromoteHeaders(Csv, [PromoteAllScalars = true])
+				in
+					Table.SelectColumns(Promoted, {"FAT_YEARMONTH", "FAT_DAY", "FATALITY_ID", "EVENT_ID", "FATALITY_TYPE", "FATALITY_AGE", "FATALITY_SEX", "FATALITY_LOCATION"}),
+			Stacked = Table.Combine(List.Transform(Files[Name], ReadOne)),
+			Shaped = Table.FromRecords(Table.TransformRows(Stacked, (r) => [
+				Fatality ID = r[FATALITY_ID],
+				Event ID = r[EVENT_ID],
+				Fatality Date = #date(Number.FromText(Text.Start(r[FAT_YEARMONTH], 4)), Number.FromText(Text.End(r[FAT_YEARMONTH], 2)), Number.FromText(r[FAT_DAY])),
+				Fatality Type = if r[FATALITY_TYPE] = "D" then "Direct" else if r[FATALITY_TYPE] = "I" then "Indirect" else "Unknown",
+				Fatality Location = if r[FATALITY_LOCATION] = null or Text.Trim(r[FATALITY_LOCATION]) = "" then "Unknown" else Text.Trim(r[FATALITY_LOCATION]),
+				Sex = if r[FATALITY_SEX] = "F" then "Female" else if r[FATALITY_SEX] = "M" then "Male" else "Not recorded",
+				Age = if r[FATALITY_AGE] = null or Text.Trim(r[FATALITY_AGE]) = "" then null else Number.FromText(Text.Trim(r[FATALITY_AGE]), "en-US")
+			])),
+			Keyed = Table.AddColumn(Shaped, "Profile Key", each [Fatality Type] & "|" & [Fatality Location] & "|" & [Sex], type text),
+			Typed = Table.TransformColumnTypes(Keyed, {{"Fatality ID", type text}, {"Event ID", type text}, {"Fatality Date", type date}, {"Fatality Type", type text}, {"Fatality Location", type text}, {"Sex", type text}, {"Age", Int64.Type}})
+		in
+			Typed
+	annotation PBI_ResultType = Table

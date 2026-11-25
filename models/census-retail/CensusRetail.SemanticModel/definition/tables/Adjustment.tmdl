@@ -1,0 +1,32 @@
+/// The two series Census publishes for every month: Not seasonally adjusted (what was sold) and Seasonally adjusted (adjusted for seasonal variation, holiday and trading-day differences, not for price changes). They are the same sales measured twice, so the measures read one at a time: with no selection they read Not seasonally adjusted, with both selected they are blank.
+table Adjustment
+
+	/// Not seasonally adjusted or Seasonally adjusted. Primary key, related to 'Fact Retail Sales'[Adjustment]. Sorted not adjusted first.
+	column Adjustment
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Adjustment
+		sortByColumn: 'Adjustment Sort'
+
+	/// Sort order for Adjustment: 1 Not seasonally adjusted, 2 Seasonally adjusted (the workbook's order).
+	column 'Adjustment Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Adjustment Sort
+
+	partition Adjustment = m
+		mode: import
+		source =
+			let
+				Source = #table(
+					type table [Adjustment = text, Adjustment Sort = Int64.Type],
+					{
+						{"Not seasonally adjusted", 1},
+						{"Seasonally adjusted", 2}
+					}
+				)
+			in
+				Source

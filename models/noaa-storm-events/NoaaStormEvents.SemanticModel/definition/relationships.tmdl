@@ -1,0 +1,35 @@
+relationship 'Fact Event to Date (Begin Date)'
+	fromColumn: 'Fact Event'.'Begin Date'
+	toColumn: Date.Date
+
+relationship 'Fact Event to End Date'
+	fromColumn: 'Fact Event'.'End Date'
+	toColumn: 'End Date'.Date
+
+relationship 'Fact Event to State'
+	fromColumn: 'Fact Event'.State
+	toColumn: State.State
+
+relationship 'Fact Event to Event Type'
+	fromColumn: 'Fact Event'.'Event Type'
+	toColumn: 'Event Type'.'Event Type'
+
+relationship 'Fact Event to Area Type'
+	fromColumn: 'Fact Event'.'CZ Type'
+	toColumn: 'Area Type'.'CZ Type'
+
+relationship 'Fact Event to Tornado Scale'
+	fromColumn: 'Fact Event'.'Tornado Scale'
+	toColumn: 'Tornado Scale'.'Tornado Scale'
+
+relationship 'Fact Fatality to Fact Event'
+	fromColumn: 'Fact Fatality'.'Event ID'
+	toColumn: 'Fact Event'.'Event ID'
+
+relationship 'Fact Fatality to Fatality Date'
+	fromColumn: 'Fact Fatality'.'Fatality Date'
+	toColumn: 'Fatality Date'.Date
+
+relationship 'Fact Fatality to Fatality Profile'
+	fromColumn: 'Fact Fatality'.'Profile Key'
+	toColumn: 'Fatality Profile'.'Profile Key'

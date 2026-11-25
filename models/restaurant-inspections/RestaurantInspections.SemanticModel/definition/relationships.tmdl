@@ -1,0 +1,43 @@
+relationship 'Fact Inspection to Date'
+	fromColumn: 'Fact Inspection'.'Inspection Date'
+	toColumn: Date.Date
+
+relationship 'Fact Inspection to Establishment'
+	fromColumn: 'Fact Inspection'.'Establishment Key'
+	toColumn: Establishment.'Establishment Key'
+
+relationship 'Fact Inspection to Jurisdiction'
+	fromColumn: 'Fact Inspection'.'Jurisdiction Key'
+	toColumn: Jurisdiction.'Jurisdiction Key'
+
+relationship 'Fact Inspection to Outcome'
+	fromColumn: 'Fact Inspection'.'Outcome Key'
+	toColumn: Outcome.'Outcome Key'
+
+relationship 'Fact Inspection to Inspection Type'
+	fromColumn: 'Fact Inspection'.'Inspection Type Key'
+	toColumn: 'Inspection Type'.'Inspection Type Key'
+
+relationship 'Fact Inspection to Critical Band'
+	fromColumn: 'Fact Inspection'.'Critical Band Key'
+	toColumn: 'Critical Band'.'Critical Band Key'
+
+relationship 'Fact Inspection to Visit Kind'
+	fromColumn: 'Fact Inspection'.'Visit Kind Key'
+	toColumn: 'Visit Kind'.'Visit Kind Key'
+
+relationship 'Fact Violation to Fact Inspection'
+	fromColumn: 'Fact Violation'.'Inspection Key'
+	toColumn: 'Fact Inspection'.'Inspection Key'
+
+relationship 'Fact Violation to Violation Category'
+	fromColumn: 'Fact Violation'.'Category Key'
+	toColumn: 'Violation Category'.'Category Key'
+
+relationship 'Fact Violation to Critical Flag'
+	fromColumn: 'Fact Violation'.'Critical Flag'
+	toColumn: 'Critical Flag'.'Critical Flag'
+
+relationship 'Fact Violation to Violation Code'
+	fromColumn: 'Fact Violation'.'Violation Code Key'
+	toColumn: 'Violation Code'.'Violation Code Key'

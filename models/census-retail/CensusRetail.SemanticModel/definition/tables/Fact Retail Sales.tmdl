@@ -1,0 +1,222 @@
+/// Fact table: U.S. retail and food services sales from the Census Bureau's Monthly Retail Trade Survey (mrtssales92-present.xlsx). Grain: kind of business x month x adjustment (not seasonally adjusted, seasonally adjusted), U.S. total only. The kind lines nest (441 holds 4411, which holds 44111) and include totals, so summing every row multiplies sales: Sales adds only the thirteen lines that partition the total, and the Line measures read one published line at a time. Every column is hidden; analysis goes through the measures and the Date, Kind and Adjustment dimensions.
+table 'Fact Retail Sales'
+
+	/// Sales in dollars for the adjustment in context, summed over whatever kind lines are in context. A building block only: it does not guard against nested lines (Sales and Line sales do). With no adjustment filter it reads the not seasonally adjusted series; with both adjustments selected it is blank, because the two series are the same sales measured twice.
+	measure 'Sales in adjustment' =
+			SWITCH (
+				TRUE (),
+				HASONEVALUE ( Adjustment[Adjustment] ), SUM ( 'Fact Retail Sales'[Sales USD] ),
+				NOT ISFILTERED ( Adjustment ), CALCULATE ( SUM ( 'Fact Retail Sales'[Sales USD] ), Adjustment[Adjustment] = "Not seasonally adjusted" )
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		isHidden
+		displayFolder: Audit
+
+	/// Retail and food services sales in dollars, adding only the thirteen kind lines that partition the published total (441-448, 451-454, 722). With no kind filter it equals Census's "Retail and food services sales, total"; filtered to one of the thirteen it is that line; filtered to a line outside them (a subsector, a total or an "excl." line) it is blank, so use Line sales there. Not seasonally adjusted unless an adjustment is selected.
+	measure Sales = CALCULATE ( [Sales in adjustment], KEEPFILTERS ( 'Fact Retail Sales'[Include In Total] = TRUE () ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Sales
+
+	/// Sales in millions of dollars, the unit Census prints.
+	measure 'Sales millions' = DIVIDE ( [Sales], 1000000 )
+		formatString: #,0
+		displayFolder: Sales
+
+	/// Sales of one published kind line, in dollars, exactly as Census prints it (children are not rolled up; the line already includes them). Blank unless exactly one kind is in context, so nested lines are never added together. This is how the total line, the "excl." lines and subsectors such as 4541 are read.
+	measure 'Line sales' = IF ( HASONEVALUE ( Kind[Kind Key] ), [Sales in adjustment] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Line
+
+	/// Line sales in millions of dollars, the unit Census prints.
+	measure 'Line sales millions' = DIVIDE ( [Line sales], 1000000 )
+		formatString: #,0
+		displayFolder: Line
+
+	/// The selected kind line as a share of "Retail and food services sales, total" in the same month(s) and adjustment. Kind filters are removed for the denominator; date and adjustment filters stay.
+	measure 'Share of retail and food services' =
+			DIVIDE (
+				[Line sales],
+				CALCULATE ( [Line sales], REMOVEFILTERS ( Kind ), Kind[Kind Key] = "Retail and food services sales, total" )
+			)
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// The selected kind line as a share of its parent line (the longest shorter NAICS code published, for example 4541 in 454), same month(s) and adjustment. Blank for lines without a parent (the three-digit lines and the uncoded totals).
+	measure 'Share of parent' =
+			VAR ParentCode = SELECTEDVALUE ( Kind[Parent Code] )
+			RETURN
+				IF (
+					NOT ISBLANK ( ParentCode ),
+					DIVIDE ( [Line sales], CALCULATE ( [Line sales], REMOVEFILTERS ( Kind ), Kind[Kind Key] = ParentCode ) )
+				)
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Sales year to date: January through the selected month of the same calendar year. Blank after the last month in the workbook.
+	measure 'Sales YTD' = IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Sales], 'Date'[Date] ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Sales in the same period one year earlier, over the same months that have data now: for a year still in progress (2026 through September) it is the prior year's January to September, not the whole prior year, so Sales YoY % compares like with like.
+	measure 'Sales prior year' =
+			VAR LastDay = EOMONTH ( [Last Data Date], 0 )
+			RETURN
+				CALCULATE ( [Sales], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Change in sales against the same period a year earlier, as a percentage of the prior year.
+	measure 'Sales YoY %' = IF ( NOT ISBLANK ( [Sales] ), DIVIDE ( [Sales] - [Sales prior year], [Sales prior year] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Sales in the month before the selected period (shifted one month back).
+	measure 'Sales prior month' = CALCULATE ( [Sales], DATEADD ( 'Date'[Date], -1, MONTH ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Change in sales against the prior month, as a percentage of the prior month. Read it on seasonally adjusted sales; not adjusted month-to-month changes are mostly the calendar.
+	measure 'Sales month to month %' = IF ( NOT ISBLANK ( [Sales] ), DIVIDE ( [Sales] - [Sales prior month], [Sales prior month] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Line sales year to date for the one selected kind line: January through the selected month. Blank after the last month in the workbook.
+	measure 'Line sales YTD' = IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Line sales], 'Date'[Date] ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Line sales for the one selected kind line in the same period one year earlier, over the same months that have data now (a year in progress compares with the same months of the prior year).
+	measure 'Line sales prior year' =
+			VAR LastDay = EOMONTH ( [Last Data Date], 0 )
+			RETURN
+				CALCULATE ( [Line sales], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Change in the selected kind line's sales against the same period a year earlier.
+	measure 'Line sales YoY %' = IF ( NOT ISBLANK ( [Line sales] ), DIVIDE ( [Line sales] - [Line sales prior year], [Line sales prior year] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Sales from the not seasonally adjusted series, whatever adjustment is selected: what was actually sold in the month. With one kind line in context it reads that line (Line sales), so subsectors and totals such as 4541 work; otherwise it is Sales (the thirteen additive lines).
+	measure 'Not adjusted sales' =
+			CALCULATE (
+				IF ( HASONEVALUE ( Kind[Kind Key] ), [Line sales], [Sales] ),
+				Adjustment[Adjustment] = "Not seasonally adjusted"
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Adjustment
+
+	/// Sales from the seasonally adjusted series (adjusted for seasonal variation, holiday and trading-day differences; not adjusted for price changes), whatever adjustment is selected. With one kind line in context it reads that line (Line sales), so subsectors and totals such as 4541 work; otherwise it is Sales (the thirteen additive lines). Blank for lines Census does not adjust, marked (NA).
+	measure 'Seasonally adjusted sales' =
+			CALCULATE (
+				IF ( HASONEVALUE ( Kind[Kind Key] ), [Line sales], [Sales] ),
+				Adjustment[Adjustment] = "Seasonally adjusted"
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Adjustment
+
+	/// Not adjusted sales divided by seasonally adjusted sales, for the total or for any one kind line in context: above 1 when the month sells more than its adjusted level (December), below 1 when less. The ratio of the two published series, not Census's official factor files.
+	measure 'Seasonal factor' = DIVIDE ( [Not adjusted sales], [Seasonally adjusted sales] )
+		formatString: 0.000
+		displayFolder: Adjustment
+
+	/// Kind lines counted in Sales that have a published figure in context. Should be 13 for any month: a completeness check on the double-counting guard.
+	measure 'Kinds in total' =
+			CALCULATE (
+				DISTINCTCOUNT ( 'Fact Retail Sales'[Kind Key] ),
+				KEEPFILTERS ( 'Fact Retail Sales'[Include In Total] = TRUE () ),
+				KEEPFILTERS ( 'Fact Retail Sales'[Cell Status] = "Published" )
+			)
+		formatString: 0
+		displayFolder: Audit
+
+	/// Cells Census withheld, marked (S): the estimate did not meet publication standards. Stored blank, never zero.
+	measure 'Suppressed cells' = CALCULATE ( COUNTROWS ( 'Fact Retail Sales' ), KEEPFILTERS ( 'Fact Retail Sales'[Cell Status] = "Suppressed" ) )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Cells Census marked (NA), not available (mostly seasonally adjusted lines that are not adjusted). Stored blank, never zero.
+	measure 'Not available cells' = CALCULATE ( COUNTROWS ( 'Fact Retail Sales' ), KEEPFILTERS ( 'Fact Retail Sales'[Cell Status] = "Not available" ) )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Sales in months Census still marks preliminary, (p) in the month header; revised in the next release.
+	measure 'Preliminary sales' = CALCULATE ( [Sales], KEEPFILTERS ( 'Fact Retail Sales'[Preliminary] = TRUE () ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Audit
+
+	/// Number of distinct months with data in the current filter context. A full year has 12.
+	measure 'Months in scope' = DISTINCTCOUNT ( 'Fact Retail Sales'[Date] )
+		formatString: 0
+		displayFolder: Audit
+
+	/// First day of the latest month in the workbook, ignoring filters. Stops year-to-date measures at the data.
+	measure 'Last Data Date' = CALCULATE ( MAX ( 'Fact Retail Sales'[Date] ), REMOVEFILTERS () )
+		formatString: yyyy-mm-dd
+		isHidden
+		displayFolder: Audit
+
+	/// First day of the month the figures are for. Foreign key to 'Date'[Date].
+	column Date
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Date
+
+	/// Kind of business: the NAICS code where the line has one (441, 4541, 4411,4412), else the published name of the total or "excl." line. Foreign key to Kind[Kind Key].
+	column 'Kind Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Kind Key
+
+	/// Not seasonally adjusted or Seasonally adjusted, from the workbook section the row sits in. Foreign key to Adjustment[Adjustment].
+	column Adjustment
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Adjustment
+
+	/// True only for the thirteen three-digit lines (441-448, 451-454, 722) that add to the published total with no remainder. The Sales measure adds only these rows.
+	column 'Include In Total'
+		dataType: boolean
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Include In Total
+
+	/// Sales in dollars (Census's millions of dollars x 1,000,000). Blank where the cell is (S) suppressed or (NA) not available.
+	column 'Sales USD'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0;(\$#,0);\$#,0
+		summarizeBy: none
+		sourceColumn: Sales USD
+
+	/// True when the month header carries (p): a preliminary estimate, revised in the next release.
+	column Preliminary
+		dataType: boolean
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Preliminary
+
+	/// What the workbook cell held: Published (a number), Suppressed ((S)) or Not available ((NA)).
+	column 'Cell Status'
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Cell Status
+
+	partition 'Fact Retail Sales' = m
+		mode: import
+		source =
+			let
+				Source = MrtsCells,
+				Kept = Table.SelectColumns(Source, {"Date", "Kind Key", "Adjustment", "Include In Total", "Sales USD", "Preliminary", "Cell Status"})
+			in
+				Kept

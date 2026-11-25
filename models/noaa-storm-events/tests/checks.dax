@@ -1,0 +1,124 @@
+// Acceptance checks run against the deployed model through the executeQueries REST API (tools/dax_checks.py).
+// Q1 to Q10 are the business questions in README.md, 2025 vintage c20261119 (loaded with 2024, vintage c20261119).
+
+// 1. Q1 and Q2 Events and episodes in 2025 (expected 73,505 events; 9,932 episodes; 68 states and areas; vintage 2026-11-19)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Events", [Events], "Episodes", [Episodes], "States", [States in scope], "Vintage", [File vintage] ),
+    'Date'[Year] = 2025
+)
+
+// 2. Q3 and Q4 Damage in 2025 (expected property 4,631,120,360; crop 273,029,900; total 4,904,150,260; 16,389 blank property cells; 14,857 events with property damage)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Property", [Property damage], "Crop", [Crop damage], "Total", [Total damage], "Blank property", [Blank property cells], "With property damage", [Events with property damage], "Per event", [Damage per event] ),
+    'Date'[Year] = 2025
+)
+
+// 3. Q5 Deaths on event rows vs the fatality file, 2025 (expected 926 = 645 direct + 281 indirect; 932 fatality records by fatality date = 649 direct + 283 indirect; injuries 1,370; 507 events with a death)
+EVALUATE
+ROW (
+    "Deaths", CALCULATE ( [Deaths], 'Date'[Year] = 2025 ),
+    "Direct", CALCULATE ( [Direct deaths], 'Date'[Year] = 2025 ),
+    "Indirect", CALCULATE ( [Indirect deaths], 'Date'[Year] = 2025 ),
+    "Injuries", CALCULATE ( [Injuries], 'Date'[Year] = 2025 ),
+    "Events with a death", CALCULATE ( [Events with a death], 'Date'[Year] = 2025 ),
+    "Fatality records", CALCULATE ( [Fatality records], 'Fatality Date'[Year] = 2025 ),
+    "Direct records", CALCULATE ( [Direct fatality records], 'Fatality Date'[Year] = 2025 ),
+    "Indirect records", CALCULATE ( [Indirect fatality records], 'Fatality Date'[Year] = 2025 )
+)
+
+// 4. Q6 and Q7 Tornadoes in 2025 (expected 1,644; EF5 1; EF2 or stronger 234; deaths on tornado rows 65; path 6,605.37 miles)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Tornadoes", [Tornadoes],
+        "EF5", CALCULATE ( [Tornadoes], 'Tornado Scale'[Tornado Scale] = "EF5" ),
+        "EF2+", [EF2 or stronger],
+        "Tornado deaths", CALCULATE ( [Deaths], 'Event Type'[Event Type] = "Tornado" ),
+        "Path miles", [Tornado path miles]
+    ),
+    'Date'[Year] = 2025
+)
+
+// 5. Q8 States by total damage, 2025 (expected Missouri 1,791,939,000 on 2,840 events, property 1,791,384,000; Washington next 544,577,900)
+EVALUATE
+CALCULATETABLE (
+    TOPN ( 3, ADDCOLUMNS ( VALUES ( State[State] ), "Total", [Total damage], "Property", [Property damage], "Crop", [Crop damage], "Events", [Events] ), [Total], DESC ),
+    'Date'[Year] = 2025
+)
+ORDER BY [Total] DESC
+
+// 6. Q9 Property damage for events that began in May 2025 (expected 1,773,718,960; 9,361 events); End Date May gives the same events in this file
+EVALUATE
+ROW (
+    "Began May", CALCULATE ( [Property damage], 'Date'[Year Month] = "2025-05" ),
+    "Events began May", CALCULATE ( [Events], 'Date'[Year Month] = "2025-05" ),
+    "Events ended May", CALCULATE ( [Events], 'End Date'[Year Month] = "2025-05" )
+)
+
+// 7. Q10 Texas tornadoes and hail, 2025 (expected 143 tornadoes, 16,062,500 property; hail 9,238 any state; hail average magnitude 1.30; tornado + hail average magnitude blank; tornadoes on a Hail filter blank)
+EVALUATE
+ROW (
+    "TX tornadoes", CALCULATE ( [Tornadoes], 'Date'[Year] = 2025, State[State] = "TEXAS" ),
+    "TX tornado property", CALCULATE ( [Property damage], 'Date'[Year] = 2025, State[State] = "TEXAS", 'Event Type'[Event Type] = "Tornado" ),
+    "Hail", CALCULATE ( [Events], 'Date'[Year] = 2025, 'Event Type'[Event Type] = "Hail" ),
+    "Hail magnitude", CALCULATE ( [Average magnitude], 'Date'[Year] = 2025, 'Event Type'[Event Type] = "Hail" ),
+    "Hail+tornado magnitude", CALCULATE ( [Average magnitude], 'Date'[Year] = 2025, 'Event Type'[Event Type] IN { "Hail", "Tornado" } ),
+    "Tornadoes on hail", CALCULATE ( [Tornadoes], 'Date'[Year] = 2025, 'Event Type'[Event Type] = "Hail" )
+)
+
+// 8. Time (expected 2025 prior year 69,802, YoY +5.3%; property prior year 15,741,503,630, YoY -70.6%; YTD May 2025 37,353; May 2025 prior year 11,183 (May 2024))
+EVALUATE
+ROW (
+    "Events 2025", CALCULATE ( [Events], 'Date'[Year] = 2025 ),
+    "Events PY", CALCULATE ( [Events prior year], 'Date'[Year] = 2025 ),
+    "Events YoY", CALCULATE ( [Events YoY %], 'Date'[Year] = 2025 ),
+    "Property PY", CALCULATE ( [Property damage prior year], 'Date'[Year] = 2025 ),
+    "Property YoY", CALCULATE ( [Property damage YoY %], 'Date'[Year] = 2025 ),
+    "YTD May 2025", CALCULATE ( [Events YTD], 'Date'[Year Month] = "2025-05" ),
+    "Property YTD 2025", CALCULATE ( [Property damage YTD], 'Date'[Year] = 2025 ),
+    "PY May 2025", CALCULATE ( [Events prior year], 'Date'[Year Month] = "2025-05" ),
+    "Last begin", [Last Begin Date]
+)
+
+// 9. Referential integrity (expected 0 everywhere; 2024 + 2025 rows; every fatality finds its event)
+EVALUATE
+ROW (
+    "Event rows", COUNTROWS ( 'Fact Event' ),
+    "Fatality rows", COUNTROWS ( 'Fact Fatality' ),
+    "No begin date", COUNTROWS ( FILTER ( 'Fact Event', ISBLANK ( RELATED ( 'Date'[Date] ) ) ) ),
+    "No end date", COUNTROWS ( FILTER ( 'Fact Event', ISBLANK ( RELATED ( 'End Date'[Date] ) ) ) ),
+    "No state", COUNTROWS ( FILTER ( 'Fact Event', ISBLANK ( RELATED ( State[State] ) ) ) ),
+    "No type", COUNTROWS ( FILTER ( 'Fact Event', ISBLANK ( RELATED ( 'Event Type'[Event Type] ) ) ) ),
+    "No area", COUNTROWS ( FILTER ( 'Fact Event', ISBLANK ( RELATED ( 'Area Type'[Area Type] ) ) ) ),
+    "No scale", COUNTROWS ( FILTER ( 'Fact Event', ISBLANK ( RELATED ( 'Tornado Scale'[Tornado Scale] ) ) ) ),
+    "Fatality no event", COUNTROWS ( FILTER ( 'Fact Fatality', ISBLANK ( RELATED ( 'Fact Event'[Event ID] ) ) ) ),
+    "Fatality no date", COUNTROWS ( FILTER ( 'Fact Fatality', ISBLANK ( RELATED ( 'Fatality Date'[Date] ) ) ) ),
+    "Fatality no profile", COUNTROWS ( FILTER ( 'Fact Fatality', ISBLANK ( RELATED ( 'Fatality Profile'[Profile Key] ) ) ) ),
+    "Other group types", CALCULATE ( COUNTROWS ( 'Event Type' ), 'Event Type'[Event Group] = "Other" )
+)
+
+// 10. Every measure, 2025 begin year (no errors; Last Begin Date is hidden)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Events", [Events], "Episodes", [Episodes], "States in scope", [States in scope],
+        "Property damage", [Property damage], "Crop damage", [Crop damage], "Total damage", [Total damage],
+        "Events with property damage", [Events with property damage], "Damage per event", [Damage per event],
+        "Deaths", [Deaths], "Direct deaths", [Direct deaths], "Indirect deaths", [Indirect deaths], "Injuries", [Injuries], "Events with a death", [Events with a death],
+        "Fatality records", [Fatality records], "Direct fatality records", [Direct fatality records], "Indirect fatality records", [Indirect fatality records], "Median age at death", [Median age at death],
+        "Tornadoes", [Tornadoes], "EF2 or stronger", [EF2 or stronger], "Tornado path miles", [Tornado path miles], "Average magnitude", [Average magnitude],
+        "Events YTD", [Events YTD], "Property damage YTD", [Property damage YTD], "Events prior year", [Events prior year], "Events YoY %", [Events YoY %],
+        "Property damage prior year", [Property damage prior year], "Property damage YoY %", [Property damage YoY %],
+        "Last Begin Date", [Last Begin Date], "Blank property cells", [Blank property cells], "File vintage", [File vintage], "Citation", [Citation]
+    ),
+    'Date'[Year] = 2025
+)
+
+// 11. Event groups, 2025 (shape check: Convective largest; no event type falls to Other unless listed there)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( 'Event Type'[Event Group] ), "Events", [Events], "Deaths", [Deaths], "Total damage", [Total damage] ),
+    'Date'[Year] = 2025
+)

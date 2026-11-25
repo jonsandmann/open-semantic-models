@@ -1,0 +1,20 @@
+/// Whether NOAA filed the event against a county or a forecast zone. Both are events; a zone is not the sum of its counties, so there is no rollup from one to the other.
+table 'Area Type'
+
+	/// NOAA's code: C county or parish, Z forecast zone, M marine zone. Primary key, related to 'Fact Event'[CZ Type].
+	column 'CZ Type'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: CZ Type
+
+	/// County, Zone or Marine zone.
+	column 'Area Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Area Type
+
+	partition 'Area Type' = m
+		mode: import
+		source = #table(type table [CZ Type = text, Area Type = text], {{"C", "County"}, {"Z", "Zone"}, {"M", "Marine zone"}})

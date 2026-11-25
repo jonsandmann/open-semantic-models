@@ -1,0 +1,32 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation Citation = NASA LANCE FIRMS, country yearly active-fire CSVs (MODIS C6.1, VIIRS S-NPP, VIIRS NOAA-20 / JPSS-1), https://firms.modaps.eosdis.nasa.gov/data/country/. We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS) (https://www.earthdata.nasa.gov/firms), part of NASA's Earth Science Data and Information System (ESDIS).
+
+annotation Disclaimer = The LANCE system is operated by the NASA/GSFC Earth Science Data and Information System (ESDIS). The information presented through LANCE, Rapid Response, GIBS, Worldview, and FIRMS are provided "as is" and users bear all responsibility and liability for their use of data. Full disclaimer: https://www.earthdata.nasa.gov/data/tools/firms
+
+annotation PBI_QueryOrder = ["FirmsBaseUrl","Countries","FirstYear","LastYear","FirmsDetections","Calendar","Fact Detection","Source","Satellite","Country","Confidence Band","Day Night","Hotspot Type","Date"]
+
+ref table 'Fact Detection'
+ref table Source
+ref table Satellite
+ref table Country
+ref table 'Confidence Band'
+ref table 'Day Night'
+ref table 'Hotspot Type'
+ref table Date
+
+ref expression FirmsBaseUrl
+ref expression Countries
+ref expression FirstYear
+ref expression LastYear
+ref expression FirmsDetections
+ref expression Calendar

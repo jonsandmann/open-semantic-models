@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "EIA Electricity Retail Sales"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "c2c0f6e6-02b4-42c0-ae6f-ebec1d162de5"
+  }
+}

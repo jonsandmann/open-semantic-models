@@ -1,0 +1,13 @@
+/// The satellite's day or night flag for the pixel (from the solar zenith angle), not local civil time.
+table 'Day Night'
+
+	/// Day or Night. Primary key, related to 'Fact Detection'[Day Night].
+	column 'Day Night'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Day Night
+
+	partition 'Day Night' = m
+		mode: import
+		source = #table(type table [Day Night = text], {{"Day"}, {"Night"}})

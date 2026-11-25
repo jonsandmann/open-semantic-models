@@ -1,0 +1,29 @@
+/// Use of the building as mapped by the data factory: residential, nonresidential, mixed, residential_or_mixed (NYC Other buildings with dwelling units), unknown.
+table 'Use Class'
+
+	/// Use class key, related to 'Fact Permit'[Use Class]. Primary key.
+	column 'Use Class'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Use Class
+
+	/// Display label.
+	column 'Use Class Label'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Use Class Label
+
+	partition 'Use Class' = m
+		mode: import
+		source =
+				#table(
+					type table [Use Class = text, Use Class Label = text],
+					{
+						{"residential", "Residential"},
+						{"nonresidential", "Non-residential"},
+						{"mixed", "Mixed"},
+						{"residential_or_mixed", "Residential or mixed"},
+						{"unknown", "Unknown"}
+					}
+				)

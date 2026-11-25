@@ -1,0 +1,22 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_QueryOrder = ["CensusBaseUrl","CalendarStart","CalendarEnd","MrtsCells","Fact Retail Sales","Kind","Adjustment","Date"]
+
+ref table 'Fact Retail Sales'
+ref table Kind
+ref table Adjustment
+ref table Date
+
+ref expression CensusBaseUrl
+ref expression CalendarStart
+ref expression CalendarEnd
+ref expression MrtsCells

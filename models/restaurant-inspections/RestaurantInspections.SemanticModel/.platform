@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "Restaurant Inspections"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "7130cae9-830a-4e86-9d7e-def3074c966e"
+  }
+}

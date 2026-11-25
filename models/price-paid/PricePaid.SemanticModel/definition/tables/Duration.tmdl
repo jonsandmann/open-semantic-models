@@ -1,0 +1,40 @@
+/// Tenure: Freehold or Leasehold, plus Unknown for the few historic records Land Registry could not classify.
+table Duration
+
+	/// Land Registry's code: F, L or U. Primary key, related to 'Fact Sale'[Duration Code].
+	column 'Duration Code'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Duration Code
+
+	/// Freehold, Leasehold or Unknown. Leases of seven years or less are not in Price Paid.
+	column Duration
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Duration
+		sortByColumn: 'Duration Sort'
+
+	/// Sort order for Duration, 1 to 3.
+	column 'Duration Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Duration Sort
+
+	partition Duration = m
+		mode: import
+		source =
+			let
+				Source = #table(
+					type table [Duration Code = text, Duration = text, Duration Sort = Int64.Type],
+					{
+						{"F", "Freehold", 1},
+						{"L", "Leasehold", 2},
+						{"U", "Unknown", 3}
+					}
+				)
+			in
+				Source

@@ -1,0 +1,223 @@
+/// Fact table: the CMS hospital overall star rating and the per-group measure counts behind it, from Hospital General Information (dataset xubh-q36u). Grain: one row per facility x catalog release; the November 2026 release has 5,435 rows, including hospitals with no Complications and Deaths rows. A separate fact because stars have no performance window. Patient-experience and timely-care groups are left out (mostly empty in this release). Every column is hidden; analysis goes through the Stars measures.
+table 'Fact Overall Rating'
+
+	/// Latest catalog release date in the filter context. The star measures read only this release, so hospitals are never counted twice when more releases are loaded.
+	measure 'Latest release date' = MAX ( 'Fact Overall Rating'[Release Date] )
+		formatString: yyyy-mm-dd
+		displayFolder: Audit
+
+	/// Hospitals with a CMS overall star rating (1 to 5) in the latest release in context. "Not Available" ratings are not counted.
+	measure 'Hospitals rated' =
+			VAR Release = [Latest release date]
+			RETURN
+				CALCULATE (
+					COUNTROWS ( 'Fact Overall Rating' ),
+					'Fact Overall Rating'[Release Date] = Release,
+					KEEPFILTERS ( NOT ISBLANK ( 'Fact Overall Rating'[Overall Rating] ) )
+				)
+		formatString: #,0
+		displayFolder: Stars
+
+	/// Mean CMS overall star rating (1 to 5) of rated hospitals in the latest release in context, unweighted.
+	measure 'Average stars' =
+			VAR Release = [Latest release date]
+			RETURN
+				CALCULATE ( AVERAGE ( 'Fact Overall Rating'[Overall Rating] ), 'Fact Overall Rating'[Release Date] = Release )
+		formatString: 0.00
+		displayFolder: Stars
+
+	/// Rated hospitals with five stars in the latest release in context.
+	measure 'Five star hospitals' =
+			VAR Release = [Latest release date]
+			RETURN
+				CALCULATE ( COUNTROWS ( 'Fact Overall Rating' ), 'Fact Overall Rating'[Release Date] = Release, KEEPFILTERS ( 'Fact Overall Rating'[Overall Rating] = 5 ) )
+		formatString: #,0
+		displayFolder: Stars
+
+	/// Rated hospitals with one star in the latest release in context.
+	measure 'One star hospitals' =
+			VAR Release = [Latest release date]
+			RETURN
+				CALCULATE ( COUNTROWS ( 'Fact Overall Rating' ), 'Fact Overall Rating'[Release Date] = Release, KEEPFILTERS ( 'Fact Overall Rating'[Overall Rating] = 1 ) )
+		formatString: #,0
+		displayFolder: Stars
+
+	/// Share of rated hospitals that have five stars.
+	measure 'Five star share' = DIVIDE ( [Five star hospitals], [Hospitals rated] )
+		formatString: 0.0%
+		displayFolder: Stars
+
+	/// Share of rated hospitals that have one star.
+	measure 'One star share' = DIVIDE ( [One star hospitals], [Hospitals rated] )
+		formatString: 0.0%
+		displayFolder: Stars
+
+	/// Sum of CMS's per-hospital counts of mortality measures rated worse than national, in the latest release in context (the counts behind the overall star rating).
+	measure 'Mortality measures worse' =
+			VAR Release = [Latest release date]
+			RETURN
+				CALCULATE ( SUM ( 'Fact Overall Rating'[Mortality Worse Count] ), 'Fact Overall Rating'[Release Date] = Release )
+		formatString: #,0
+		displayFolder: Stars
+
+	/// Sum of CMS's per-hospital counts of safety measures rated worse than national, in the latest release in context (the counts behind the overall star rating).
+	measure 'Safety measures worse' =
+			VAR Release = [Latest release date]
+			RETURN
+				CALCULATE ( SUM ( 'Fact Overall Rating'[Safety Worse Count] ), 'Fact Overall Rating'[Release Date] = Release )
+		formatString: #,0
+		displayFolder: Stars
+
+	/// Sum of CMS's per-hospital counts of readmission measures rated worse than national, in the latest release in context (the counts behind the overall star rating).
+	measure 'Readmission measures worse' =
+			VAR Release = [Latest release date]
+			RETURN
+				CALCULATE ( SUM ( 'Fact Overall Rating'[Readmission Worse Count] ), 'Fact Overall Rating'[Release Date] = Release )
+		formatString: #,0
+		displayFolder: Stars
+
+	/// CMS Certification Number of the hospital. Foreign key to Hospital[Facility ID].
+	column 'Facility ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Facility ID
+
+	/// Catalog release the rating was published in, read from the dataset's metastore entry at refresh (2026-11-12 for this release). Active relationship to 'Release Date'[Date]; not related to 'Performance Date' (stars have no performance window).
+	column 'Release Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Release Date
+
+	/// CMS hospital overall star rating, 1 to 5. Blank where CMS published "Not Available" (too few measures, or a hospital type CMS does not rate). Read through the Stars measures.
+	column 'Overall Rating'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Overall Rating
+
+	/// Count of mortality (death-rate) measures CMS scored for the hospital in its overall star rating, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Mortality Measures Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Mortality Measures Count
+
+	/// Count of mortality (death-rate) measures CMS rates better than national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Mortality Better Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Mortality Better Count
+
+	/// Count of mortality (death-rate) measures CMS rates no different from national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Mortality No Different Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Mortality No Different Count
+
+	/// Count of mortality (death-rate) measures CMS rates worse than national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Mortality Worse Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Mortality Worse Count
+
+	/// Count of safety measures CMS scored for the hospital in its overall star rating, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Safety Measures Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Safety Measures Count
+
+	/// Count of safety measures CMS rates better than national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Safety Better Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Safety Better Count
+
+	/// Count of safety measures CMS rates no different from national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Safety No Different Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Safety No Different Count
+
+	/// Count of safety measures CMS rates worse than national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Safety Worse Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Safety Worse Count
+
+	/// Count of readmission measures CMS scored for the hospital in its overall star rating, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Readmission Measures Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Readmission Measures Count
+
+	/// Count of readmission measures CMS rates better than national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Readmission Better Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Readmission Better Count
+
+	/// Count of readmission measures CMS rates no different from national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Readmission No Different Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Readmission No Different Count
+
+	/// Count of readmission measures CMS rates worse than national, as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals in one release only.
+	column 'Readmission Worse Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Readmission Worse Count
+
+	partition 'Fact Overall Rating' = m
+		mode: import
+		source =
+			let
+				Source = GeneralInformation,
+				Keep = Table.SelectColumns(Source, {"Facility ID", "Release Date", "Hospital overall rating", "Count of Facility MORT Measures", "Count of MORT Measures Better", "Count of MORT Measures No Different", "Count of MORT Measures Worse", "Count of Facility Safety Measures", "Count of Safety Measures Better", "Count of Safety Measures No Different", "Count of Safety Measures Worse", "Count of Facility READM Measures", "Count of READM Measures Better", "Count of READM Measures No Different", "Count of READM Measures Worse"}),
+				Renamed = Table.RenameColumns(Keep, {{"Hospital overall rating", "Overall Rating"}, {"Count of Facility MORT Measures", "Mortality Measures Count"}, {"Count of MORT Measures Better", "Mortality Better Count"}, {"Count of MORT Measures No Different", "Mortality No Different Count"}, {"Count of MORT Measures Worse", "Mortality Worse Count"}, {"Count of Facility Safety Measures", "Safety Measures Count"}, {"Count of Safety Measures Better", "Safety Better Count"}, {"Count of Safety Measures No Different", "Safety No Different Count"}, {"Count of Safety Measures Worse", "Safety Worse Count"}, {"Count of Facility READM Measures", "Readmission Measures Count"}, {"Count of READM Measures Better", "Readmission Better Count"}, {"Count of READM Measures No Different", "Readmission No Different Count"}, {"Count of READM Measures Worse", "Readmission Worse Count"}}),
+				// "Not Available" becomes null before typing, never zero.
+				ToNumber = (t) => try Number.FromText(t, "en-US") otherwise null,
+				Converted = Table.TransformColumns(Renamed, List.Transform({"Overall Rating", "Mortality Measures Count", "Mortality Better Count", "Mortality No Different Count", "Mortality Worse Count", "Safety Measures Count", "Safety Better Count", "Safety No Different Count", "Safety Worse Count", "Readmission Measures Count", "Readmission Better Count", "Readmission No Different Count", "Readmission Worse Count"}, (c) => {c, ToNumber})),
+				Typed = Table.TransformColumnTypes(Converted, {{"Facility ID", type text}} & List.Transform({"Overall Rating", "Mortality Measures Count", "Mortality Better Count", "Mortality No Different Count", "Mortality Worse Count", "Safety Measures Count", "Safety Better Count", "Safety No Different Count", "Safety Worse Count", "Readmission Measures Count", "Readmission Better Count", "Readmission No Different Count", "Readmission Worse Count"}, (c) => {c, Int64.Type}))
+			in
+				Typed

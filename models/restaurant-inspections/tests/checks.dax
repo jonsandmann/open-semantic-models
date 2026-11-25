@@ -1,0 +1,140 @@
+// Acceptance checks run against the deployed model through the executeQueries REST API (tools/dax_checks.py).
+// Q1 to Q10 are the business questions in README.md. Expected answers were computed first from the data factory's
+// Parquet files with duckdb (tests/expected.py). "Window" = routine inspections, 2024-01-01 to 2026-10-31, the
+// base of the data factory's FINDINGS.md.
+
+// 1. Q1 Totals, everything loaded (expected 582,036 inspections; 1,181,038 violations; 363,455 critical; 143,370 establishments inspected: 143,368 ids plus the placeholders chicago:(unknown) and montgomery:(unknown))
+EVALUATE
+ROW ( "Inspections", [Inspections], "Violations", [Violations], "Critical", [Critical violations], "Establishments inspected", [Establishments inspected], "Critical count column", SUM ( 'Fact Inspection'[Critical Count] ) )
+
+// 2. Q2 Critical violations per inspection by jurisdiction, window (expected NYC 1.8683, Delaware 2.3536, Boston 0.7195, Toronto 0.3344, NYS 0.3441; Austin blank)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( Jurisdiction[Jurisdiction Key] ), "Inspections", [Inspections], "Critical per inspection", [Critical violations per inspection], "Violations per inspection", [Violations per inspection] ),
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 3. Q3 Re-inspection rate at 3+ criticals, window (expected Toronto 81.36%, NYC 99.64%, Marin 85.0%, Boston/Chicago/King County/Montgomery 100%; Delaware, NYS blank)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( Jurisdiction[Jurisdiction Key] ), "With 3+", [Inspections with 3+ criticals], "Re-inspection rate", [Re-inspection rate at 3+ criticals] ),
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 4. Q4 Closure rate at 3+ criticals, window (expected Boston 4.12%, NYC 5.24%, Toronto 2.74%, Montgomery 1.67%, Marin 6.25%, Chicago 0%, King County 0%; zero, not blank)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( Jurisdiction[Jurisdiction Key] ), "Closure rate at 3+", [Closure rate at 3+ criticals] ),
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 5. Q5 Published outcome (not comparable), window (expected Boston 40.03%, King County 30.67%, Chicago 22.72%, NYC 19.15%, Toronto 0.10%, Austin 0.44%; Delaware, NYS blank)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( Jurisdiction[Jurisdiction Key] ), "Published outcome", [Published outcome] ),
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 6. Q6 Boston on first visits only, window (expected published outcome 61.12% first visits vs 40.03% all; follow-up share 40.62%, 12,911 of 31,787)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "All", [Published outcome],
+        "First visits", CALCULATE ( [Published outcome], 'Visit Kind'[Visit Kind] = "First visit" ),
+        "Follow-up share", [Follow-up share],
+        "Follow-ups", CALCULATE ( [Inspections], 'Visit Kind'[Visit Kind Key] = 2 ),
+        "Inspections", [Inspections]
+    ),
+    Jurisdiction[Jurisdiction Key] = "boston",
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 7. Q7 Share of inspections citing pests and temperature, window (expected pests NYC 31.80%, King County 3.58%, Marin 2.71%; temperature NYC 42.98%, Toronto 4.31%)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS (
+        VALUES ( Jurisdiction[Jurisdiction Key] ),
+        "Pests", CALCULATE ( [Share of inspections citing], 'Violation Category'[Category Key] = "pests" ),
+        "Temperature", CALCULATE ( [Share of inspections citing], 'Violation Category'[Category Key] = "temperature_control" )
+    ),
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 8. Q8 Chains vs everyone else, window (expected NYC 1.0920 vs 1.9641, ratio 0.556; Toronto 0.1190 vs 0.3483; King County 0.4136 vs 0.4827; Montgomery 0.3252 vs 0.4198 with its 91 id-less inspections among the others; ratio blank with all jurisdictions)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( Jurisdiction[Jurisdiction Key] ), "Chain", [Chain critical per inspection], "Others", [Independent critical per inspection], "Ratio", [Chain ratio] ),
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 9. Q9 Average burden score, window (expected NYC 83.93, Delaware 80.62, Toronto 96.46, Austin 91.18 native)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( Jurisdiction[Jurisdiction Key] ), "Burden score", [Average burden score] ),
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 10. Q10 Temperature citations, summer vs winter, window (expected Boston Jun-Aug 14.02% vs Dec-Feb 10.06%; Toronto 4.95% vs 3.89%; NYS 23.37% vs 25.07%)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS (
+        VALUES ( Jurisdiction[Jurisdiction Key] ),
+        "Summer", CALCULATE ( [Share of inspections citing], 'Date'[Season] = "Jun-Aug" ),
+        "Winter", CALCULATE ( [Share of inspections citing], 'Date'[Season] = "Dec-Feb" )
+    ),
+    'Violation Category'[Category Key] = "temperature_control",
+    'Inspection Type'[Inspection Type Key] = "routine",
+    DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 1 ), DATE ( 2026, 10, 31 ) )
+)
+
+// 11. Time: NYC routine critical per inspection 2025 vs prior year (expected 1.8489 vs 1.8388; inspections 13,139 vs 12,878)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Critical per inspection", [Critical violations per inspection], "Prior year", [Critical per inspection prior year], "Change", [Critical per inspection change], "Inspections", [Inspections], "Inspections PY", [Inspections prior year], "YoY", [Inspections YoY %] ),
+    Jurisdiction[Jurisdiction Key] = "nyc",
+    'Inspection Type'[Inspection Type Key] = "routine",
+    'Date'[Year] = 2025
+)
+
+// 12. Categories, everything loaded (expected facility 317,680 / 14,008 critical; temperature 147,126 / 114,621; other 2,342 / 23)
+EVALUATE
+ADDCOLUMNS ( VALUES ( 'Violation Category'[Category Key] ), "Violations", [Violations], "Critical", [Critical violations] )
+
+// 13. Referential integrity (expected every count 0) and key counts
+EVALUATE
+ROW (
+    "Inspections no date", COUNTROWS ( FILTER ( 'Fact Inspection', ISBLANK ( RELATED ( 'Date'[Date] ) ) ) ),
+    "Inspections no establishment", COUNTROWS ( FILTER ( 'Fact Inspection', ISBLANK ( RELATED ( Establishment[Establishment Key] ) ) ) ),
+    "Inspections no jurisdiction", COUNTROWS ( FILTER ( 'Fact Inspection', ISBLANK ( RELATED ( Jurisdiction[Jurisdiction Key] ) ) ) ),
+    "Inspections no outcome", COUNTROWS ( FILTER ( 'Fact Inspection', ISBLANK ( RELATED ( Outcome[Outcome Key] ) ) ) ),
+    "Inspections no type", COUNTROWS ( FILTER ( 'Fact Inspection', ISBLANK ( RELATED ( 'Inspection Type'[Inspection Type Key] ) ) ) ),
+    "Violations no inspection", COUNTROWS ( FILTER ( 'Fact Violation', ISBLANK ( RELATED ( 'Fact Inspection'[Inspection Key] ) ) ) ),
+    "Violations no category", COUNTROWS ( FILTER ( 'Fact Violation', ISBLANK ( RELATED ( 'Violation Category'[Category Key] ) ) ) ),
+    "Violations no code", COUNTROWS ( FILTER ( 'Fact Violation', ISBLANK ( RELATED ( 'Violation Code'[Violation Code Key] ) ) ) ),
+    "Establishments", COUNTROWS ( Establishment ),
+    "Chain establishments", COUNTROWS ( FILTER ( Establishment, Establishment[Is Chain] ) ),
+    "Codes", COUNTROWS ( 'Violation Code' ),
+    "Outcomes", COUNTROWS ( Outcome )
+)
+
+// 14. Every measure evaluates (no filter)
+EVALUATE
+ROW (
+    "Inspections", [Inspections], "With violation data", [Inspections with violation data], "Establishments inspected", [Establishments inspected],
+    "Per establishment", [Inspections per establishment], "Follow-up share", [Follow-up share], "No violation", [Share with no violation],
+    "Burden", [Average burden score], "3+", [Inspections with 3+ criticals], "Share 3+", [Share with 3+ criticals], "With a verdict", [Inspections with a verdict],
+    "Reinsp 3+", [Re-inspection rate at 3+ criticals], "Closures", [Closures], "Closure rate", [Closure rate], "Closure 3+", [Closure rate at 3+ criticals],
+    "Published outcome", [Published outcome], "Last date", [Last inspection date], "Insp PY", [Inspections prior year], "Insp YoY", [Inspections YoY %],
+    "Violations", [Violations], "Critical", [Critical violations], "Critical share", [Critical share of violations], "Viol per insp", [Violations per inspection],
+    "Crit per insp", [Critical violations per inspection], "Citing", [Inspections citing], "Share citing", [Share of inspections citing],
+    "Chain crit", [Chain critical per inspection], "Indep crit", [Independent critical per inspection], "Chain ratio", [Chain ratio],
+    "Crit PY", [Critical per inspection prior year], "Crit change", [Critical per inspection change], "Attribution", LEN ( [Attribution] )
+)

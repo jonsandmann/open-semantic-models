@@ -1,0 +1,54 @@
+/// The 14 common work categories from the data factory crosswalk (schema.md). Compare categories, not raw permit totals: NYC issues one work permit per trade per job and Seattle's file holds no trades.
+table Category
+
+	/// Category code as stored on the fact, for example new_residential. Primary key.
+	column 'Category Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Category Key
+
+	/// Display name, for example New residential.
+	column Category
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Category
+		sortByColumn: 'Category Sort'
+
+	/// Work class the category belongs to: new, addition, alteration, demolition, trade or other.
+	column 'Work Class'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Work Class
+
+	/// Sort order matching schema.md.
+	column 'Category Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Category Sort
+
+	partition Category = m
+		mode: import
+		source =
+				#table(
+					type table [Category Key = text, Category = text, Work Class = text, Category Sort = number],
+					{
+						{"new_residential", "New residential", "new", 1},
+						{"new_nonresidential", "New non-residential", "new", 2},
+						{"addition", "Addition", "addition", 3},
+						{"alteration_residential", "Alteration, residential", "alteration", 4},
+						{"alteration_nonresidential", "Alteration, non-residential", "alteration", 5},
+						{"roof_exterior", "Roof / exterior", "alteration", 6},
+						{"demolition", "Demolition", "demolition", 7},
+						{"electrical", "Electrical", "trade", 8},
+						{"plumbing_gas", "Plumbing / gas", "trade", 9},
+						{"mechanical_hvac", "Mechanical / HVAC", "trade", 10},
+						{"fire_protection", "Fire protection", "trade", 11},
+						{"solar_ev", "Solar / EV", "trade", 12},
+						{"site_accessory", "Site / accessory", "other", 13},
+						{"temporary_admin_other", "Temporary / admin / other", "other", 14}
+					}
+				)

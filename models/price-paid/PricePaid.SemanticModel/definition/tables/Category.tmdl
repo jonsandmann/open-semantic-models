@@ -1,0 +1,32 @@
+/// Price Paid Data category. Standard (A) is a single residential property sold for value, the one to use for house prices. Additional (B) covers transfers under a power of sale (repossessions), buy-to-lets identified by a mortgage, transfers to non-private individuals and sales of property typed Other; the price measures leave it out.
+table Category
+
+	/// Standard or Additional. Primary key, related to 'Fact Sale'[Category].
+	column Category
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Category
+		sortByColumn: 'Category Sort'
+
+	/// Land Registry's code: A Standard, B Additional.
+	column 'Category Code'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Category Code
+
+	/// Sort order for Category: 1 Standard, 2 Additional.
+	column 'Category Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Category Sort
+
+	partition Category = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [Category = text, Category Code = text, Category Sort = Int64.Type], {{"Standard", "A", 1}, {"Additional", "B", 2}})
+			in
+				Source

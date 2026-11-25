@@ -1,0 +1,112 @@
+/// Calendar dimension, one row per day from CalendarStart (1 January 1992) to CalendarEnd (31 December of the current year). Marked as the model's date table; drives year-to-date and prior-year measures. Census retail figures are monthly, so facts land on the first day of each month.
+table Date
+	dataCategory: Time
+
+	/// Calendar date. Primary key, related to 'Fact Retail Sales'[Date] (the first of each month).
+	column Date
+		dataType: dateTime
+		isKey
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Date
+
+	/// Calendar year, for example 2026.
+	column Year
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year
+
+	/// Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+	column Quarter
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Quarter
+		sortByColumn: 'Quarter Number'
+
+	/// Quarter of the year as a number, 1 to 4.
+	column 'Quarter Number'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Quarter Number
+
+	/// Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+	column 'Year Quarter'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Year Quarter
+		sortByColumn: 'Year Quarter Number'
+
+	/// Sort key for Year Quarter: year times 10 plus quarter, for example 20263.
+	column 'Year Quarter Number'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year Quarter Number
+
+	/// Full month name, January to December. Sorted by Month Number.
+	column Month
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Month
+		sortByColumn: 'Month Number'
+
+	/// Abbreviated month name, Jan to Dec. Sorted by Month Number.
+	column 'Month Short'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Month Short
+		sortByColumn: 'Month Number'
+
+	/// Month of the year as a number, 1 to 12.
+	column 'Month Number'
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Month Number
+
+	/// Year and month as YYYY-MM, for example 2026-09. Sorted by Year Month Sort.
+	column 'Year Month'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Year Month
+		sortByColumn: 'Year Month Sort'
+
+	/// Sort key for Year Month: year times 100 plus month, for example 202609.
+	column 'Year Month Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year Month Sort
+
+	/// First day of the month, the date the Census monthly figures are keyed to.
+	column 'Month Start'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Month Start
+
+	partition Date = m
+		mode: import
+		source =
+			let
+				DayCount = Duration.Days(CalendarEnd - CalendarStart) + 1,
+				Dates = List.Dates(CalendarStart, DayCount, #duration(1, 0, 0, 0)),
+				Base = Table.FromList(Dates, Splitter.SplitByNothing(), type table [Date = date]),
+				AddYear = Table.AddColumn(Base, "Year", each Date.Year([Date]), Int64.Type),
+				AddQuarterNumber = Table.AddColumn(AddYear, "Quarter Number", each Date.QuarterOfYear([Date]), Int64.Type),
+				AddQuarter = Table.AddColumn(AddQuarterNumber, "Quarter", each "Q" & Text.From([Quarter Number]), type text),
+				AddYearQuarter = Table.AddColumn(AddQuarter, "Year Quarter", each Text.From([Year]) & " Q" & Text.From([Quarter Number]), type text),
+				AddYearQuarterNumber = Table.AddColumn(AddYearQuarter, "Year Quarter Number", each [Year] * 10 + [Quarter Number], Int64.Type),
+				AddMonthNumber = Table.AddColumn(AddYearQuarterNumber, "Month Number", each Date.Month([Date]), Int64.Type),
+				AddMonth = Table.AddColumn(AddMonthNumber, "Month", each Date.ToText([Date], [Format = "MMMM", Culture = "en-US"]), type text),
+				AddMonthShort = Table.AddColumn(AddMonth, "Month Short", each Date.ToText([Date], [Format = "MMM", Culture = "en-US"]), type text),
+				AddYearMonth = Table.AddColumn(AddMonthShort, "Year Month", each Text.From([Year]) & "-" & Text.PadStart(Text.From([Month Number]), 2, "0"), type text),
+				AddYearMonthSort = Table.AddColumn(AddYearMonth, "Year Month Sort", each [Year] * 100 + [Month Number], Int64.Type),
+				AddMonthStart = Table.AddColumn(AddYearMonthSort, "Month Start", each Date.StartOfMonth([Date]), type date)
+			in
+				AddMonthStart

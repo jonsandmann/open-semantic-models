@@ -1,0 +1,61 @@
+// Checks run against the deployed model through the executeQueries REST API (see docs/toolchain.md).
+// 1. Monthly measures, including time intelligence.
+EVALUATE
+SUMMARIZECOLUMNS (
+    'Date'[Year Month Number],
+    'Date'[Year Month],
+    "Trips", [Trips],
+    "Trips PY", [Trips PY],
+    "Trips YoY %", [Trips YoY %],
+    "Trips YTD", [Trips YTD],
+    "Total Revenue", [Total Revenue],
+    "Total Revenue YTD", [Total Revenue YTD],
+    "Total Revenue YoY %", [Total Revenue YoY %],
+    "Avg Fare per Trip", [Avg Fare per Trip],
+    "Avg Fare per Trip YoY %", [Avg Fare per Trip YoY %],
+    "Card Tip Rate %", [Card Tip Rate %],
+    "Airport Pickup %", [Airport Pickup %],
+    "CBD Zone Trip %", [CBD Zone Trip %],
+    "Avg Speed (mph)", [Avg Speed (mph)]
+)
+ORDER BY 'Date'[Year Month Number]
+
+// 2. Referential integrity: trips whose keys find no dimension row (should all be 0).
+EVALUATE
+ROW (
+    "Trips", [Trips],
+    "No Date", COUNTROWS ( FILTER ( Trips, ISBLANK ( RELATED ( 'Date'[Year] ) ) ) ),
+    "No Pickup Zone", COUNTROWS ( FILTER ( Trips, ISBLANK ( RELATED ( 'Pickup Zone'[Pickup Borough] ) ) ) ),
+    "No Dropoff Zone", COUNTROWS ( FILTER ( Trips, ISBLANK ( RELATED ( 'Dropoff Zone'[Dropoff Borough] ) ) ) ),
+    "No Vendor", COUNTROWS ( FILTER ( Trips, ISBLANK ( RELATED ( Vendor[Vendor] ) ) ) ),
+    "No Rate Code", COUNTROWS ( FILTER ( Trips, ISBLANK ( RELATED ( 'Rate Code'[Rate Code] ) ) ) ),
+    "No Payment Type", COUNTROWS ( FILTER ( Trips, ISBLANK ( RELATED ( 'Payment Type'[Payment Type] ) ) ) )
+)
+
+// 3. Slicing by dimensions, January 2025.
+EVALUATE
+CALCULATETABLE (
+    SUMMARIZECOLUMNS (
+        'Pickup Zone'[Pickup Borough],
+        'Time of Day'[Day Part],
+        "Trips", [Trips],
+        "Avg Fare per Trip", [Avg Fare per Trip]
+    ),
+    'Date'[Year Month Number] = 202501
+)
+ORDER BY 'Pickup Zone'[Pickup Borough], 'Time of Day'[Day Part]
+
+// 4. Review fixes, 24 Nov (expected: blank plus a number is the number in DAX; Taxes and Surcharges equals the six components summed with blanks as zero, January 2025; Through Last Trip Date is a contiguous cutoff, true on every day up to the last pickup)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Blank plus 5", BLANK () + 5,
+        "Taxes and Surcharges", [Taxes and Surcharges],
+        "Components, blanks as zero",
+            COALESCE ( SUM ( Trips[Extra Amount] ), 0 ) + COALESCE ( SUM ( Trips[MTA Tax] ), 0 ) + COALESCE ( SUM ( Trips[Improvement Surcharge] ), 0 )
+                + COALESCE ( SUM ( Trips[Congestion Surcharge] ), 0 ) + COALESCE ( SUM ( Trips[Airport Fee] ), 0 ) + COALESCE ( SUM ( Trips[CBD Congestion Fee] ), 0 ),
+        "Null extra rows", COUNTROWS ( FILTER ( Trips, ISBLANK ( Trips[Extra Amount] ) ) ),
+        "Null improvement rows", COUNTROWS ( FILTER ( Trips, ISBLANK ( Trips[Improvement Surcharge] ) ) )
+    ),
+    'Date'[Year Month Number] = 202501
+)

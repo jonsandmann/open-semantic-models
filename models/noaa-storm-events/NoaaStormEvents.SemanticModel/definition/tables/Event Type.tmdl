@@ -1,0 +1,44 @@
+/// NOAA's event types (Directive 10-1605), one row per type present in the loaded files, with a broad group for filtering. Tornado, hail and thunderstorm wind stay separate types, so magnitudes in different units are never averaged together. The group is a label only; it is not a second grain.
+table 'Event Type'
+
+	/// Event type as NOAA publishes it, for example Tornado, Hail, Flash Flood. Primary key, related to 'Fact Event'[Event Type].
+	column 'Event Type'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Event Type
+
+	/// Broad group: Convective, Flood, Winter, Tropical, Heat and drought, Wind, or Other. For filtering, not for adding as its own fact.
+	column 'Event Group'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Event Group
+		sortByColumn: 'Event Group Sort'
+
+	/// Sort order for Event Group, 1 to 7.
+	column 'Event Group Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Event Group Sort
+
+	partition 'Event Type' = m
+		mode: import
+		source =
+			let
+				Types = Table.Distinct(Table.SelectColumns(StormDetails, {"Event Type"})),
+				Groups = [
+					Convective = {"Thunderstorm Wind", "Hail", "Tornado", "Funnel Cloud", "Lightning", "Dust Devil", "Marine Thunderstorm Wind", "Marine Hail", "Marine Lightning", "Waterspout"},
+					Flood = {"Flash Flood", "Flood", "Coastal Flood", "Lakeshore Flood", "Heavy Rain", "Debris Flow", "Storm Surge/Tide", "Seiche"},
+					Winter = {"Blizzard", "Cold/Wind Chill", "Extreme Cold/Wind Chill", "Frost/Freeze", "Heavy Snow", "Ice Storm", "Lake-Effect Snow", "Sleet", "Winter Storm", "Winter Weather", "Freezing Fog", "Avalanche"},
+					Tropical = {"Tropical Storm", "Tropical Depression", "Hurricane", "Hurricane (Typhoon)", "Marine Tropical Storm", "Marine Tropical Depression", "Marine Hurricane/Typhoon"},
+					#"Heat and drought" = {"Excessive Heat", "Heat", "Drought", "Wildfire", "Dust Storm"},
+					Wind = {"High Wind", "Strong Wind", "Marine High Wind", "Marine Strong Wind"}
+				],
+				Order = {"Convective", "Flood", "Winter", "Tropical", "Heat and drought", "Wind", "Other"},
+				GroupOf = (t as text) as text => List.First(List.Select(Record.FieldNames(Groups), (g) => List.Contains(Record.Field(Groups, g), t)), "Other"),
+				WithGroup = Table.AddColumn(Types, "Event Group", each GroupOf([Event Type]), type text),
+				WithSort = Table.AddColumn(WithGroup, "Event Group Sort", each List.PositionOf(Order, [Event Group]) + 1, Int64.Type)
+			in
+				WithSort

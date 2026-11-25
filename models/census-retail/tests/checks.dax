@@ -1,0 +1,157 @@
+// Acceptance checks run against the deployed model through the executeQueries REST API (tools/dax_checks.py).
+// Q1 to Q10 are the business questions in README.md, pinned to the November 2026 workbook (latest month September 2026, preliminary).
+// Expected answers were recomputed from the raw workbook with Python (openpyxl), in millions of dollars as Census prints them.
+
+// 1. Q1 Retail and food services, not seasonally adjusted, September 2026 (expected 728,961; the total line and the thirteen-line Sales agree)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Sales millions", [Sales millions],
+        "Total line millions", CALCULATE ( [Line sales millions], Kind[Kind Key] = "Retail and food services sales, total" ),
+        "Kinds in total", [Kinds in total]
+    ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Not seasonally adjusted"
+)
+
+// 2. Q2 Same, September 2025, and the change (expected 680,630; +7.101%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales millions", [Sales millions], "Prior year millions", DIVIDE ( [Sales prior year], 1000000 ), "Sales YoY %", [Sales YoY %] ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Not seasonally adjusted"
+)
+
+// 3. Q3 Seasonally adjusted total, September 2026 vs September 2025 (expected 746,637 vs 700,614; +6.569%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales millions", [Sales millions], "Prior year millions", DIVIDE ( [Sales prior year], 1000000 ), "Sales YoY %", [Sales YoY %] ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Seasonally adjusted"
+)
+
+// 4. Q4 Not adjusted, January to September 2026 vs the same months of 2025 (expected 6,448,116 vs 6,153,323; +4.791%; YTD at September agrees)
+EVALUATE
+ROW (
+    "Jan-Sep 2026 millions", CALCULATE ( [Sales millions], 'Date'[Year] = 2026, 'Date'[Month Number] <= 9 ),
+    "Jan-Sep 2025 millions", CALCULATE ( DIVIDE ( [Sales prior year], 1000000 ), 'Date'[Year] = 2026, 'Date'[Month Number] <= 9 ),
+    "YoY %", CALCULATE ( [Sales YoY %], 'Date'[Year] = 2026, 'Date'[Month Number] <= 9 ),
+    "Sales YTD Sep 2026 millions", CALCULATE ( DIVIDE ( [Sales YTD], 1000000 ), 'Date'[Year Month] = "2026-09" ),
+    "Total line YTD millions", CALCULATE ( DIVIDE ( [Line sales YTD], 1000000 ), 'Date'[Year Month] = "2026-09", Kind[Kind Key] = "Retail and food services sales, total" ),
+    "Sales YTD Dec 2026 (blank)", CALCULATE ( [Sales YTD], 'Date'[Year Month] = "2026-12" )
+)
+
+// 5. Q5 Gasoline stations, not adjusted, September 2026, and share of the total (expected 69,135; 9.484%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Line sales millions", [Line sales millions], "Sales millions", [Sales millions], "Share of total", [Share of retail and food services] ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Not seasonally adjusted", Kind[Kind Code] = "447"
+)
+
+// 6. Q6 Nonstore retailers and electronic shopping, not adjusted, September 2026 (expected 119,973, 16.458%; 4541 113,238, 94.386% of nonstore; Sales blank for 4541)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS (
+        CALCULATETABLE ( VALUES ( Kind[Kind] ), Kind[Kind Code] IN { "454", "4541" } ),
+        "Line sales millions", [Line sales millions],
+        "Share of total", [Share of retail and food services],
+        "Share of parent", [Share of parent],
+        "Sales (blank for 4541)", [Sales]
+    ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Not seasonally adjusted"
+)
+
+// 7. Q7 Food services and drinking places, not adjusted, September 2026 (expected 91,767; 12.589%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Line sales millions", [Line sales millions], "Share of total", [Share of retail and food services] ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Not seasonally adjusted", Kind[Kind Code] = "722"
+)
+
+// 8. Q8 Not adjusted total, December 2025 vs September 2025 (expected 780,707 vs 680,630; December 14.704% higher)
+EVALUATE
+VAR Dec = CALCULATE ( [Sales millions], 'Date'[Year Month] = "2025-12", Adjustment[Adjustment] = "Not seasonally adjusted" )
+VAR Sep = CALCULATE ( [Sales millions], 'Date'[Year Month] = "2025-09", Adjustment[Adjustment] = "Not seasonally adjusted" )
+RETURN ROW ( "Dec 2025 millions", Dec, "Sep 2025 millions", Sep, "Dec over Sep %", DIVIDE ( Dec - Sep, Sep ) )
+
+// 9. Q9 Seasonally adjusted gasoline stations, September 2026, share of the adjusted total (expected 67,581 / 746,637 = 9.051%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Line sales millions", [Line sales millions], "Share of total", [Share of retail and food services] ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Seasonally adjusted", Kind[Kind Code] = "447"
+)
+
+// 10. Q10 Not adjusted total, January 1992 (expected 142,051; the thirteen lines sum to the same)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Sales millions", [Sales millions],
+        "Total line millions", CALCULATE ( [Line sales millions], Kind[Kind Key] = "Retail and food services sales, total" ),
+        "Kinds in total", [Kinds in total]
+    ),
+    'Date'[Year Month] = "1992-01", Adjustment[Adjustment] = "Not seasonally adjusted"
+)
+
+// 11. Load and integrity (expected 42,534 rows: 41,392 published, 710 suppressed, 432 not available, 0 other; 64 kinds; 417 months; 102 preliminary rows; 0 orphans; 0 month x adjustment where the thirteen lines miss the total line, of 834)
+EVALUATE
+VAR Checks =
+    ADDCOLUMNS (
+        SUMMARIZE ( 'Fact Retail Sales', 'Date'[Year Month], Adjustment[Adjustment] ),
+        "Thirteen", [Sales],
+        "Total line", CALCULATE ( [Line sales], Kind[Kind Key] = "Retail and food services sales, total" )
+    )
+RETURN
+    ROW (
+        "Rows", COUNTROWS ( 'Fact Retail Sales' ),
+        "Published", CALCULATE ( COUNTROWS ( 'Fact Retail Sales' ), 'Fact Retail Sales'[Cell Status] = "Published" ),
+        "Suppressed", CALCULATE ( [Suppressed cells], REMOVEFILTERS () ),
+        "Not available", CALCULATE ( [Not available cells], REMOVEFILTERS () ),
+        "Other", CALCULATE ( COUNTROWS ( 'Fact Retail Sales' ), 'Fact Retail Sales'[Cell Status] = "Other" ),
+        "Kinds", COUNTROWS ( Kind ),
+        "Months", [Months in scope],
+        "Preliminary rows", CALCULATE ( COUNTROWS ( 'Fact Retail Sales' ), 'Fact Retail Sales'[Preliminary] = TRUE () ),
+        "Orphan dates", COUNTROWS ( FILTER ( 'Fact Retail Sales', ISBLANK ( RELATED ( 'Date'[Date] ) ) ) ),
+        "Orphan kinds", COUNTROWS ( FILTER ( 'Fact Retail Sales', ISBLANK ( RELATED ( Kind[Kind Key] ) ) ) ),
+        "Orphan adjustments", COUNTROWS ( FILTER ( 'Fact Retail Sales', ISBLANK ( RELATED ( Adjustment[Adjustment] ) ) ) ),
+        "Month x adjustment", COUNTROWS ( Checks ),
+        "Thirteen miss total", COUNTROWS ( FILTER ( Checks, [Thirteen] <> [Total line] ) ),
+        "Last data date", [Last Data Date]
+    )
+
+// 12. Double-counting guards (expected: Line sales with no kind filter blank; Sales with both adjustments selected blank; Sales with no adjustment filter = not adjusted 728,961; seasonal factor 0.976; 44111 parent 4411, 443141 parent 443, 722513 parent 7225, 442,443 no parent)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Line sales, no kind filter", [Line sales],
+        "Sales, both adjustments", CALCULATE ( [Sales], Adjustment[Adjustment] IN { "Not seasonally adjusted", "Seasonally adjusted" } ),
+        "Sales, no adjustment filter millions", [Sales millions],
+        "Seasonal factor", [Seasonal factor],
+        "Parent of 44111", LOOKUPVALUE ( Kind[Parent Code], Kind[Kind Key], "44111" ),
+        "Parent of 443141", LOOKUPVALUE ( Kind[Parent Code], Kind[Kind Key], "443141" ),
+        "Parent of 722513", LOOKUPVALUE ( Kind[Parent Code], Kind[Kind Key], "722513, 722514, 722515" ),
+        "Parent of 442,443", LOOKUPVALUE ( Kind[Parent Code], Kind[Kind Key], "442,443" )
+    ),
+    'Date'[Year Month] = "2026-09"
+)
+
+// 13. The remaining measures evaluate (expected, not adjusted Sep 2026: prior month 751,781 (Aug 2026), -3.035%; gasoline Sep 2025 54,234, +27.475%; preliminary sales 728,961)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Sales prior month millions", DIVIDE ( [Sales prior month], 1000000 ),
+        "Sales month to month %", [Sales month to month %],
+        "Gasoline line prior year millions", CALCULATE ( DIVIDE ( [Line sales prior year], 1000000 ), Kind[Kind Code] = "447" ),
+        "Gasoline line YoY %", CALCULATE ( [Line sales YoY %], Kind[Kind Code] = "447" ),
+        "Preliminary sales millions", DIVIDE ( [Preliminary sales], 1000000 )
+    ),
+    'Date'[Year Month] = "2026-09", Adjustment[Adjustment] = "Not seasonally adjusted"
+)
+
+// 14. Review fixes, 24 Nov (expected: Seasonal factor reads one kind line, so 441, 4541 and the total all have one for not adjusted Sep 2026 (total 0.976); 2026 prior year is January to September 2025, 6,153,323, so 2026 YoY is +4.791% as in Q4, not against all of 2025)
+EVALUATE
+ROW (
+    "Factor total Sep 2026", CALCULATE ( [Seasonal factor], 'Date'[Year Month] = "2026-09" ),
+    "Factor 441 Sep 2026", CALCULATE ( [Seasonal factor], 'Date'[Year Month] = "2026-09", Kind[Kind Code] = "441" ),
+    "Factor 4541 Sep 2026", CALCULATE ( [Seasonal factor], 'Date'[Year Month] = "2026-09", Kind[Kind Code] = "4541" ),
+    "Prior year for 2026 millions", CALCULATE ( DIVIDE ( [Sales prior year], 1000000 ), 'Date'[Year] = 2026, Adjustment[Adjustment] = "Not seasonally adjusted" ),
+    "YoY 2026", CALCULATE ( [Sales YoY %], 'Date'[Year] = 2026, Adjustment[Adjustment] = "Not seasonally adjusted" ),
+    "Prior year for 2025 millions (whole 2024)", CALCULATE ( DIVIDE ( [Sales prior year], 1000000 ), 'Date'[Year] = 2025, Adjustment[Adjustment] = "Not seasonally adjusted" ),
+    "Sales 2024 millions", CALCULATE ( [Sales millions], 'Date'[Year] = 2024, Adjustment[Adjustment] = "Not seasonally adjusted" )
+)

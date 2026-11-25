@@ -1,0 +1,27 @@
+relationship 'Fact Sale to Date'
+	fromColumn: 'Fact Sale'.'Transfer Date'
+	toColumn: Date.Date
+
+relationship 'Fact Sale to Location'
+	fromColumn: 'Fact Sale'.'Location Key'
+	toColumn: Location.'Location Key'
+
+relationship 'Fact Sale to Property Type'
+	fromColumn: 'Fact Sale'.'Property Type Code'
+	toColumn: 'Property Type'.'Property Type Code'
+
+relationship 'Fact Sale to Duration'
+	fromColumn: 'Fact Sale'.'Duration Code'
+	toColumn: Duration.'Duration Code'
+
+relationship 'Fact Sale to Build'
+	fromColumn: 'Fact Sale'.Build
+	toColumn: Build.Build
+
+relationship 'Fact Sale to Category'
+	fromColumn: 'Fact Sale'.Category
+	toColumn: Category.Category
+
+relationship 'Fact Sale to Record Status'
+	fromColumn: 'Fact Sale'.'Record Status'
+	toColumn: 'Record Status'.'Record Status'

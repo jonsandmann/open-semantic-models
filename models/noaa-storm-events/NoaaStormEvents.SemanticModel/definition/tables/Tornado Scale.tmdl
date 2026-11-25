@@ -1,0 +1,38 @@
+/// Tornado intensity rating (Enhanced Fujita, or Fujita for older years). Every event that is not a rated tornado has the scale None. EFU means the tornado could not be rated; it is not weaker or stronger than any rating.
+table 'Tornado Scale'
+
+	/// EF0 to EF5, F0 to F5, EFU (unknown), or None. Primary key, related to 'Fact Event'[Tornado Scale].
+	column 'Tornado Scale'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Tornado Scale
+		sortByColumn: 'Scale Sort'
+
+	/// The scale's number, 0 to 5. Blank for EFU and None. EF2 or stronger reads this.
+	column 'Scale Number'
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Scale Number
+
+	/// Sort order: the numbered ratings first, then EFU, then None.
+	column 'Scale Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Scale Sort
+
+	partition 'Tornado Scale' = m
+		mode: import
+		source =
+			let
+				Scales = Table.Distinct(Table.SelectColumns(StormDetails, {"Tornado Scale"})),
+				Numbered = Table.AddColumn(Scales, "Scale Number", each
+					let d = Text.Select([Tornado Scale], {"0" .. "9"}) in if d = "" then null else Number.FromText(d), Int64.Type),
+				Sorted = Table.AddColumn(Numbered, "Scale Sort", each
+					if [Scale Number] <> null then [Scale Number] * 10 + (if Text.StartsWith([Tornado Scale], "EF") then 1 else 0)
+					else if [Tornado Scale] = "None" then 999 else 900, Int64.Type)
+			in
+				Sorted

@@ -1,0 +1,61 @@
+/// The data factory's 15 common violation categories (CROSSWALK.md), onto which every jurisdiction's codes are mapped. A zero for a category in a jurisdiction can mean its form has no item for it (Montgomery's 16-item form has no cleaning item; NYC and New York State have no garbage item), not that the problem never happens.
+table 'Violation Category'
+
+	/// Category code, for example temperature_control. Primary key, related to 'Fact Violation'[Category Key].
+	column 'Category Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Category Key
+
+	/// Category name, for example Temperature control. Sorted by Category Sort.
+	column Category
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Category
+		sortByColumn: 'Category Sort'
+
+	/// What the category covers.
+	column Covers
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Covers
+
+	/// True when the category is an FDA foodborne-illness risk factor; Delaware's and Montgomery's critical flag is derived from it.
+	column 'FDA Risk Factor'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: FDA Risk Factor
+
+	/// Sort order (risk factors first, then upkeep, then paperwork, then other).
+	column 'Category Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Category Sort
+
+	partition 'Violation Category' = m
+		mode: import
+		source =
+				#table(
+					type table [Category Key = text, Category = text, Covers = text, FDA Risk Factor = logical, Category Sort = Int64.Type],
+					{
+						{"temperature_control", "Temperature control", "Hot and cold holding, cooling, cooking, reheating, thawing, date marking, time as a control, thermometers", true, 1},
+						{"hand_washing", "Hand washing", "Hand sinks (access, supplies, misuse), washing hands", true, 2},
+						{"employee_hygiene_health", "Employee hygiene and health", "Bare-hand contact, ill workers, hair restraints, eating or smoking by staff, clothing, gloves", true, 3},
+						{"food_protection_contamination", "Food protection and contamination", "Cross-contamination, raw and ready-to-eat separation, covering and storing food, in-use utensils, ice", true, 4},
+						{"food_source_condition", "Food source and condition", "Approved source, unsafe or spoiled food, shellfish tags, damaged cans, unpasteurized products", true, 5},
+						{"cleaning_sanitizing", "Cleaning and sanitizing", "Food-contact surfaces and utensils cleaned and sanitized, sanitizer strength, wiping cloths, warewashing", true, 6},
+						{"toxic_chemicals", "Toxic chemicals", "Poisonous or toxic substances stored, labelled or used wrongly", true, 7},
+						{"pests", "Pests", "Rodents, insects, droppings, pest entry and harbourage, pest-control records, live animals (not an FDA risk factor; NYC, Chicago and Toronto flag live pests critical themselves)", false, 8},
+						{"water_plumbing_sewage", "Water, plumbing and sewage", "Potable water, hot water, plumbing, backflow, sewage", false, 9},
+						{"facility_maintenance", "Facility maintenance", "Floors, walls, ceilings, lighting, ventilation, toilets, non-food-contact cleanliness, clutter", false, 10},
+						{"equipment_utensils", "Equipment and utensils", "Equipment design, construction, repair, storage, single-service articles", false, 11},
+						{"garbage_waste", "Garbage and waste", "Refuse storage and removal", false, 12},
+						{"knowledge_certification", "Knowledge and certification", "Person in charge, certified manager, food-handler cards and training, HACCP plans", false, 13},
+						{"labeling_signage_admin", "Labelling, signage and admin", "Labels, consumer advisories, allergen and calorie notices, permits, posted grades, records", false, 14},
+						{"other", "Other", "Unmatched rows, almost all Boston codes with no description", false, 15}
+					}
+				)

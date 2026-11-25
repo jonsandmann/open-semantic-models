@@ -1,0 +1,197 @@
+/// Fact table: HM Land Registry Price Paid, one row per transaction id in the monthly update file (98,103 rows in the 28 Oct 2026 file, transfers dated 6 Jan 1995 to 30 Sep 2026). The file is the month's additions, changes and deletions, not every sale that completed in a month. No address-level field is loaded: no postcode, PAON, SAON, street or locality. Every column is hidden; analysis goes through the measures and the dimensions. Contains HM Land Registry data © Crown copyright and database right 2026. This data is licensed under the Open Government Licence v3.0.
+table 'Fact Sale'
+
+	/// Standard Price Paid transfers (category A) that the file does not delete: the sales count every price measure is built on.
+	measure Sales = CALCULATE ( COUNTROWS ( 'Fact Sale' ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () ) )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Every record in the filter context: standard and additional, added, changed and deleted.
+	measure 'All records' = COUNTROWS ( 'Fact Sale' )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Records the file deletes. A delete withdraws an earlier record and is not a sale.
+	measure 'Deleted records' = CALCULATE ( [All records], KEEPFILTERS ( 'Record Status'[Record Status] = "Deleted" ) )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Additional Price Paid transfers (category B: repossessions, buy-to-lets, non-private buyers, property typed Other) that are not deleted. Kept out of Sales and every price measure.
+	measure 'Additional transfers' = CALCULATE ( [All records], KEEPFILTERS ( Category[Category] = "Additional" ), KEEPFILTERS ( 'Record Status'[Record Status] <> "Deleted" ) )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Median price paid over standard sales, the headline typical price. A few very high sales pull the mean up; the median does not move with them.
+	measure 'Median price' = CALCULATE ( MEDIAN ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () ) )
+		formatString: \£#,0
+		displayFolder: Price
+
+	/// Mean (average) price paid over standard sales. Higher than the median because of a few very high sales; label it as the mean.
+	measure 'Mean price' = CALCULATE ( AVERAGE ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () ) )
+		formatString: \£#,0
+		displayFolder: Price
+
+	/// Sum of prices paid over standard sales: the money that changed hands, not a typical price.
+	measure 'Total consideration' = CALCULATE ( SUM ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () ) )
+		formatString: \£#,0
+		displayFolder: Price
+
+	/// Lowest price paid in a standard sale.
+	measure 'Lowest price' = CALCULATE ( MIN ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () ) )
+		formatString: \£#,0
+		displayFolder: Price
+
+	/// Highest price paid in a standard sale. The model holds no address, so the sale behind it cannot be pinned to a home.
+	measure 'Highest price' = CALCULATE ( MAX ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () ) )
+		formatString: \£#,0
+		displayFolder: Price
+
+	/// Sales in the filter context as a share of all sales in the same dates, across every location, property type, tenure and build. Date, category and record status filters stay.
+	measure 'Share of sales' =
+			DIVIDE (
+				[Sales],
+				CALCULATE ( [Sales], REMOVEFILTERS ( Location ), REMOVEFILTERS ( 'Property Type' ), REMOVEFILTERS ( Duration ), REMOVEFILTERS ( Build ) )
+			)
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Freehold standard sales as a share of standard sales in the filter context.
+	measure 'Freehold share' = DIVIDE ( CALCULATE ( [Sales], KEEPFILTERS ( Duration[Duration Code] = "F" ) ), [Sales] )
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Standard sales of newly built property. Most new-build sales are registered months after completion, so a recent month in one update file holds few of them; do not read it as the new-build market.
+	measure 'New build sales' = CALCULATE ( [Sales], KEEPFILTERS ( Build[Build] = "New build" ) )
+		formatString: #,0
+		displayFolder: Mix
+
+	/// Standard sales at a price under £250,000.
+	measure 'Sales under £250,000' = CALCULATE ( [Sales], KEEPFILTERS ( 'Fact Sale'[Price GBP] < 250000 ) )
+		formatString: #,0
+		displayFolder: Mix
+
+	/// Standard sales at a price of £1,000,000 or more.
+	measure 'Sales of £1 million or more' = CALCULATE ( [Sales], KEEPFILTERS ( 'Fact Sale'[Price GBP] >= 1000000 ) )
+		formatString: #,0
+		displayFolder: Mix
+
+	/// Total consideration in the filter context as a share of all standard consideration in the same dates, across every location, property type, tenure and build.
+	measure 'Share of consideration' =
+			DIVIDE (
+				[Total consideration],
+				CALCULATE ( [Total consideration], REMOVEFILTERS ( Location ), REMOVEFILTERS ( 'Property Type' ), REMOVEFILTERS ( Duration ), REMOVEFILTERS ( Build ) )
+			)
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Standard sales in the month before (dates shifted back one month). In one update file the latest months are still arriving, so a rise or fall here is about registration timing as much as the market.
+	measure 'Sales prior month' = CALCULATE ( [Sales], DATEADD ( 'Date'[Date], -1, MONTH ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Median price of standard sales in the month before (dates shifted back one month).
+	measure 'Median price prior month' = CALCULATE ( [Median price], DATEADD ( 'Date'[Date], -1, MONTH ) )
+		formatString: \£#,0
+		displayFolder: Time
+
+	/// Median price minus the median price in the month before. Blank unless both months have standard sales.
+	measure 'Median price change' =
+			VAR CurrentMedian = [Median price]
+			VAR PriorMedian = [Median price prior month]
+			RETURN
+				IF ( NOT ISBLANK ( CurrentMedian ) && NOT ISBLANK ( PriorMedian ), CurrentMedian - PriorMedian )
+		formatString: +\£#,0;-\£#,0;\£0
+		displayFolder: Time
+
+	/// The attribution HM Land Registry and the Open Government Licence v3.0 require on anything built from this data, with the year of the latest transfer loaded. Put it on every report page.
+	measure Attribution =
+			"Contains HM Land Registry data © Crown copyright and database right "
+				& FORMAT ( YEAR ( CALCULATE ( MAX ( 'Fact Sale'[Transfer Date] ), REMOVEFILTERS () ) ), "0" )
+				& ". This data is licensed under the Open Government Licence v3.0."
+		formatString: @
+		displayFolder: About
+
+	/// Land Registry's unique identifier for the transaction, a GUID in braces. One row per id in a monthly file; a later file can repeat an id as a change or a delete.
+	column 'Transaction ID'
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Transaction ID
+
+	/// Date of transfer on the deed (the sale completed). Foreign key to 'Date'[Date].
+	column 'Transfer Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Transfer Date
+
+	/// Price paid in whole pounds, as stated on the transfer deed. Read through the price measures; never summed as a count.
+	column 'Price GBP'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: \£#,0
+		summarizeBy: none
+		sourceColumn: Price GBP
+
+	/// Property type code D, S, T, F or O. Foreign key to 'Property Type'[Property Type Code].
+	column 'Property Type Code'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Property Type Code
+
+	/// Tenure code F, L or U. Foreign key to Duration[Duration Code].
+	column 'Duration Code'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Duration Code
+
+	/// New build or Established, from the old/new flag. Foreign key to Build[Build].
+	column Build
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Build
+
+	/// Standard or Additional, from the PPD category type. Foreign key to Category[Category].
+	column Category
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Category
+
+	/// Added, Changed or Deleted, from the record status. Foreign key to 'Record Status'[Record Status].
+	column 'Record Status'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Record Status
+
+	/// True for a standard transfer (category A) that is not deleted. Every sales and price measure filters on it.
+	column 'Is Standard Sale'
+		dataType: boolean
+		isHidden
+		isAvailableInMdx: false
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		summarizeBy: none
+		sourceColumn: Is Standard Sale
+
+	/// District and town joined with "|". Foreign key to Location[Location Key].
+	column 'Location Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Location Key
+
+	partition 'Fact Sale' = m
+		mode: import
+		source =
+			let
+				Source = PricePaid,
+				Fact = Table.SelectColumns(Source, {"Transaction ID", "Transfer Date", "Price GBP", "Property Type Code", "Duration Code", "Build", "Category", "Record Status", "Is Standard Sale", "Location Key"})
+			in
+				Fact

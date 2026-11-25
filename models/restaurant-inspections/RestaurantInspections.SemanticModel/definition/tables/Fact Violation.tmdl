@@ -1,0 +1,127 @@
+/// Fact table: one row per violation cited (the data factory's joined violations.parquet), each mapped to one of 15 common categories and flagged critical by its jurisdiction's own definition. Related many-to-one to 'Fact Inspection' by Inspection Key, so date, establishment, jurisdiction and inspection-type filters reach violations through their inspection; category and critical filters stay on violations. Per-inspection measures divide by 'Fact Inspection' rows, never by violation rows. Austin publishes no violations. Every column is hidden.
+table 'Fact Violation'
+
+	/// Violation rows in context. Recording habits differ (NYC cites a code once per inspection; King County and Toronto can cite one problem as several rows), so compare jurisdictions per inspection, not on totals.
+	measure Violations = COUNTROWS ( 'Fact Violation' )
+		formatString: #,0
+		displayFolder: Findings
+
+	/// Critical violations in context, each jurisdiction's own critical flag (derived from the category in Delaware and Montgomery). Respects a Critical Flag filter: with Not critical picked it is blank.
+	measure 'Critical violations' = CALCULATE ( [Violations], KEEPFILTERS ( 'Critical Flag'[Critical Flag] = "Critical" ) )
+		formatString: #,0
+		displayFolder: Findings
+
+	/// Critical violations as a share of all violations in context.
+	measure 'Critical share of violations' = DIVIDE ( [Critical violations], [Violations] )
+		formatString: 0.0%
+		displayFolder: Findings
+
+	/// Violations per inspection with violation data (Austin left out). With a category picked, that category's violations per inspection.
+	measure 'Violations per inspection' = DIVIDE ( COALESCE ( [Violations], 0 ), [Inspections with violation data] )
+		formatString: 0.00
+		displayFolder: Findings
+
+	/// The headline comparable measure: critical violations per inspection with violation data (Austin left out). Compares what inspectors found, not how each jurisdiction judged it. Still read with Jurisdiction[Critical Means]: Toronto's and Boston's critical are wider than NYC's, so NYC's 1.87 is, if anything, an undercount next to them.
+	measure 'Critical violations per inspection' = DIVIDE ( COALESCE ( [Critical violations], 0 ), [Inspections with violation data] )
+		formatString: 0.00
+		displayFolder: Findings
+
+	/// Inspections that cited at least one violation in context: pick a Violation Category to count inspections citing it. Counted once per inspection, however many rows it cited.
+	measure 'Inspections citing' = DISTINCTCOUNT ( 'Fact Violation'[Inspection Key] )
+		formatString: #,0
+		displayFolder: Findings
+
+	/// Share of inspections with violation data that cited at least one violation in context (with a category picked: the share citing that category, for example pests at 31.8% of NYC routine inspections).
+	measure 'Share of inspections citing' = DIVIDE ( COALESCE ( [Inspections citing], 0 ), [Inspections with violation data] )
+		formatString: 0.0%
+		displayFolder: Findings
+
+	/// Critical violations per inspection at establishments of the 18 tracked chains.
+	measure 'Chain critical per inspection' = CALCULATE ( [Critical violations per inspection], KEEPFILTERS ( Establishment[Is Chain] = TRUE () ) )
+		formatString: 0.00
+		displayFolder: Chains
+
+	/// Critical violations per inspection at every other establishment.
+	measure 'Independent critical per inspection' = CALCULATE ( [Critical violations per inspection], KEEPFILTERS ( Establishment[Is Chain] = FALSE () ) )
+		formatString: 0.00
+		displayFolder: Chains
+
+	/// Chain critical per inspection divided by everyone else's, within one jurisdiction (under 1: chains are cited less). Blank unless exactly one jurisdiction is in context, because pooling mixes jurisdictions with different critical definitions and chain shares.
+	measure 'Chain ratio' = IF ( HASONEVALUE ( Jurisdiction[Jurisdiction Key] ), DIVIDE ( [Chain critical per inspection], [Independent critical per inspection] ) )
+		formatString: 0.00
+		displayFolder: Chains
+
+	/// Critical violations per inspection in the same period one year earlier, over the days up to the last inspection date. Partial where a jurisdiction's data starts later (Jurisdiction[Data From]).
+	measure 'Critical per inspection prior year' =
+			VAR LastDay = [Last inspection date]
+			RETURN
+				CALCULATE ( [Critical violations per inspection], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: 0.00
+		displayFolder: Time
+
+	/// Change in critical violations per inspection against the same period a year earlier, in violations per inspection (a difference, not a percentage).
+	measure 'Critical per inspection change' = IF ( NOT ISBLANK ( [Critical per inspection prior year] ), [Critical violations per inspection] - [Critical per inspection prior year] )
+		formatString: +0.00;-0.00;0.00
+		displayFolder: Time
+
+	/// Attribution owed when anything built on the model is published.
+	measure Attribution = "Joined from ten open restaurant-inspection datasets (NYC DOHMH, Chicago CDPH, Public Health - Seattle & King County, Austin Public Health, Montgomery County MD HHS, Delaware Division of Public Health, Marin County EHS, NYSDOH, Boston ISD, Toronto Public Health DineSafe). Contains information licensed under the Open Government Licence - Toronto. Marin County data: Open Database License (ODbL), County of Marin."
+		formatString: @
+		displayFolder: About
+
+	/// Inspection id, foreign key to 'Fact Inspection'.
+	column 'Inspection Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Inspection Key
+
+	/// Common category code, foreign key to Violation Category.
+	column 'Category Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Category Key
+
+	/// Critical or Not critical, foreign key to Critical Flag.
+	column 'Critical Flag'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Critical Flag
+
+	/// published when the jurisdiction flags it, derived_from_category in Delaware and Montgomery.
+	column 'Critical Basis'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Critical Basis
+
+	/// Jurisdiction and code, foreign key to Violation Code.
+	column 'Violation Code Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Violation Code Key
+
+	/// Points deducted, where published (King County).
+	column Points
+		isAvailableInMdx: false
+		dataType: decimal
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Points
+
+	partition 'Fact Violation' = m
+		mode: import
+		source =
+				let
+					Raw = Table.SelectColumns(Parquet.Document(InspectionFiles{[Name = "violations.parquet"]}[Content]), {"insp_id", "source", "code", "critical", "critical_basis", "category", "points"}),
+					CodeKey = Table.AddColumn(Raw, "Violation Code Key", each [source] & "|" & (if [code] = null then "" else [code]), type text),
+					Flag = Table.AddColumn(CodeKey, "Critical Flag", each if [critical] = true then "Critical" else "Not critical", type text),
+					Renamed = Table.RenameColumns(Flag, {{"insp_id", "Inspection Key"}, {"category", "Category Key"}, {"critical_basis", "Critical Basis"}, {"points", "Points"}}),
+					Final = Table.TransformColumnTypes(Table.SelectColumns(Renamed, {"Inspection Key", "Category Key", "Critical Flag", "Critical Basis", "Violation Code Key", "Points"}), {{"Inspection Key", type text}, {"Category Key", type text}, {"Critical Basis", type text}, {"Points", Currency.Type}})
+				in
+					Final

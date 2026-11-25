@@ -1,0 +1,31 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation Attribution = Joined from ten open restaurant-inspection datasets (NYC DOHMH, Chicago CDPH, Public Health - Seattle & King County, Austin Public Health, Montgomery County MD HHS, Delaware Division of Public Health, Marin County EHS, NYSDOH, Boston ISD, Toronto Public Health DineSafe). Contains information licensed under the Open Government Licence - Toronto. Marin County data under the Open Database License (ODbL); the derived database is shared under ODbL with attribution to the County of Marin.
+
+annotation PBI_QueryOrder = ["InspectionsFolder","InspectionFiles","Calendar","Fact Inspection","Fact Violation","Establishment","Jurisdiction","Outcome","Inspection Type","Critical Band","Visit Kind","Violation Category","Critical Flag","Violation Code","Date"]
+
+ref table 'Fact Inspection'
+ref table 'Fact Violation'
+ref table Establishment
+ref table Jurisdiction
+ref table Outcome
+ref table 'Inspection Type'
+ref table 'Critical Band'
+ref table 'Visit Kind'
+ref table 'Violation Category'
+ref table 'Critical Flag'
+ref table 'Violation Code'
+ref table Date
+
+ref expression InspectionsFolder
+ref expression InspectionFiles
+ref expression Calendar

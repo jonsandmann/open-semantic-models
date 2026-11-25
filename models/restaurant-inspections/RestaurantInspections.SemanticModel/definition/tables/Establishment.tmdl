@@ -1,0 +1,134 @@
+/// Establishments (restaurants and other food businesses) as published by each jurisdiction, from their most recent row. Nothing is matched across jurisdictions. 93 inspections (91 Montgomery, 2 Chicago) carry no establishment id; they point to a placeholder row per jurisdiction, <jurisdiction>:(unknown), so no inspection is lost. Two establishment rows with no id are dropped. Address fields are business data, not personal data.
+table Establishment
+
+	/// <jurisdiction>:<publisher id>, for example nyc:41234567 (Delaware publishes no id, so its key is name|address|zip). Primary key, related to 'Fact Inspection'[Establishment Key].
+	column 'Establishment Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Establishment Key
+
+	/// The publisher's own establishment id (NYC CAMIS, Chicago licence number, and so on).
+	column 'Publisher Id'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Publisher Id
+
+	/// Jurisdiction id of the establishment (same codes as Jurisdiction[Jurisdiction Key]). Not related: filter by jurisdiction through the Jurisdiction table.
+	column 'Jurisdiction Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Jurisdiction Key
+
+	/// Business name as published.
+	column Name
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Name
+
+	/// Name in upper case with punctuation, store numbers and legal suffixes removed: groups a chain's branches (every STARBUCKS).
+	column 'Name Normalized'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Name Normalized
+
+	/// Street address as published.
+	column Address
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Address
+
+	/// City as published.
+	column City
+		dataType: string
+		dataCategory: City
+		summarizeBy: none
+		sourceColumn: City
+
+	/// Two-letter state or province code (ON for Toronto).
+	column State
+		dataType: string
+		dataCategory: StateOrProvince
+		summarizeBy: none
+		sourceColumn: State
+
+	/// ZIP or postal code as published.
+	column Zip
+		dataType: string
+		dataCategory: PostalCode
+		summarizeBy: none
+		sourceColumn: Zip
+
+	/// Latitude as published, fixed decimal to four places (about 11 m); blank in King County (none published).
+	column Latitude
+		dataType: decimal
+		dataCategory: Latitude
+		formatString: 0.0000
+		summarizeBy: none
+		sourceColumn: Latitude
+
+	/// Longitude as published, fixed decimal to four places; blank in King County (none published).
+	column Longitude
+		dataType: decimal
+		dataCategory: Longitude
+		formatString: 0.0000
+		summarizeBy: none
+		sourceColumn: Longitude
+
+	/// The publisher's facility class where one exists (Chicago facility type, King County classification, Montgomery licence subtype, Boston description, New York State food service description).
+	column 'Facility Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Facility Type
+
+	/// Cuisine, New York City only.
+	column Cuisine
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Cuisine
+
+	/// One of the 18 national chains the findings track (Starbucks, McDonald's, Subway, Dunkin', Chipotle, Burger King, 7-Eleven, Taco Bell, Wendy's, Domino's, Panera, Popeyes, Chick-fil-A, KFC, Pizza Hut, Panda Express, Jersey Mike's, Tim Hortons), matched on the start of the normalized name; (not a chain) otherwise. Franchisees listed under an operator's name are not caught, which biases chain comparisons toward no difference.
+	column Chain
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Chain
+
+	/// True for an establishment of one of the 18 tracked chains.
+	column 'Is Chain'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Is Chain
+
+	/// Chain or Independent / other, for slicing.
+	column 'Chain or Independent'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Chain or Independent
+
+	partition Establishment = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(InspectionFiles{[Name = "establishments.parquet"]}[Content]),
+					Known = Table.Distinct(Table.SelectRows(Raw, each [est_id] <> null), {"est_id"}),
+					InspectedRaw = Table.SelectColumns(Parquet.Document(InspectionFiles{[Name = "inspections.parquet"]}[Content]), {"est_id", "source"}),
+					Inspected = Table.Distinct(Table.FromColumns({List.Transform(Table.ToRecords(InspectedRaw), each if [est_id] = null then [source] & ":(unknown)" else [est_id]), InspectedRaw[source]}, type table [est_id = text, source = text])),
+					Missing = Table.SelectColumns(Table.NestedJoin(Inspected, {"est_id"}, Known, {"est_id"}, "k", JoinKind.LeftAnti), {"est_id", "source"}),
+					MissingNamed = Table.AddColumn(Missing, "name", each "(no establishment id published)", type text),
+					All = Table.Combine({Known, MissingNamed}),
+					Chains = {{"STARBUCKS", "Starbucks"}, {"MCDONALD", "McDonald's"}, {"SUBWAY", "Subway"}, {"DUNKIN", "Dunkin'"}, {"CHIPOTLE", "Chipotle"}, {"BURGER KING", "Burger King"}, {"7 ELEVEN", "7-Eleven"}, {"TACO BELL", "Taco Bell"}, {"WENDY", "Wendy's"}, {"DOMINO", "Domino's"}, {"PANERA", "Panera"}, {"POPEYES", "Popeyes"}, {"CHICK FIL A", "Chick-fil-A"}, {"KFC", "KFC"}, {"PIZZA HUT", "Pizza Hut"}, {"PANDA EXPRESS", "Panda Express"}, {"JERSEY MIKE", "Jersey Mike's"}, {"TIM HORTONS", "Tim Hortons"}},
+					ChainOf = (n as nullable text) as nullable text =>
+						if n = null then null
+						else let hit = List.First(List.Select(Chains, (c) => Text.StartsWith(n, c{0}) or Text.StartsWith(Text.Remove(n, " "), Text.Remove(c{0}, " ")))) in if hit = null then null else hit{1},
+					WithChain = Table.AddColumn(All, "ChainName", each ChainOf([name_norm]), type nullable text),
+					Shaped = Table.FromColumns({
+						WithChain[est_id], WithChain[source_est_id], WithChain[source], WithChain[name], WithChain[name_norm], WithChain[address], WithChain[city], WithChain[state], WithChain[zip],
+						WithChain[lat], WithChain[lon], WithChain[facility_type], WithChain[cuisine],
+						List.Transform(WithChain[ChainName], each if _ = null then "(not a chain)" else _),
+						List.Transform(WithChain[ChainName], each _ <> null),
+						List.Transform(WithChain[ChainName], each if _ = null then "Independent / other" else "Chain")
+					}, type table [Establishment Key = text, Publisher Id = nullable text, Jurisdiction Key = text, Name = nullable text, Name Normalized = nullable text, Address = nullable text, City = nullable text, State = nullable text, Zip = nullable text, Latitude = nullable Currency.Type, Longitude = nullable Currency.Type, Facility Type = nullable text, Cuisine = nullable text, Chain = text, Is Chain = logical, Chain or Independent = text])
+				in
+					Shaped

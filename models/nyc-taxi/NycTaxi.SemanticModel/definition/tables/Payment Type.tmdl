@@ -1,0 +1,44 @@
+/// How the passenger paid, per the TLC data dictionary, with a coarser Payment Group for reporting.
+table 'Payment Type'
+
+	/// TLC payment_type code. Primary key, related to Trips[Payment Type ID].
+	column 'Payment Type ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Payment Type ID
+
+	/// Payment type: Flex Fare, Credit Card, Cash, No Charge, Dispute, Unknown or Voided. Sorted by Payment Type ID.
+	column 'Payment Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Payment Type
+		sortByColumn: 'Payment Type ID'
+
+	/// Reporting group: Card, Cash, Flex Fare, Not Collected (no charge, dispute, voided) or Unknown.
+	column 'Payment Group'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Payment Group
+
+	partition 'Payment Type' = m
+		mode: import
+		source =
+			let
+				// Codes from the TLC Yellow Taxi data dictionary (March 2025).
+				Source = #table(
+					type table [Payment Type ID = Int64.Type, Payment Type = text, Payment Group = text],
+					{
+						{0, "Flex Fare", "Flex Fare"},
+						{1, "Credit Card", "Card"},
+						{2, "Cash", "Cash"},
+						{3, "No Charge", "Not Collected"},
+						{4, "Dispute", "Not Collected"},
+						{5, "Unknown", "Unknown"},
+						{6, "Voided", "Not Collected"}
+					}
+				)
+			in
+				Source

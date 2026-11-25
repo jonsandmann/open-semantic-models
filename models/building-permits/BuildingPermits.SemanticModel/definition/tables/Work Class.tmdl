@@ -1,0 +1,33 @@
+/// Work class derived from category: new, addition, alteration, demolition, trade, other.
+table 'Work Class'
+
+	/// Work class key, related to 'Fact Permit'[Work Class]. Primary key.
+	column 'Work Class'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Work Class
+		sortByColumn: 'Work Class Sort'
+
+	/// Sort order for Work Class: new, addition, alteration, demolition, trade, other.
+	column 'Work Class Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Work Class Sort
+
+	partition 'Work Class' = m
+		mode: import
+		source =
+				#table(
+					type table [Work Class = text, Work Class Sort = number],
+					{
+						{"new", 1},
+						{"addition", 2},
+						{"alteration", 3},
+						{"demolition", 4},
+						{"trade", 5},
+						{"other", 6}
+					}
+				)

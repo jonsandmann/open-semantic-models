@@ -1,0 +1,34 @@
+/// End-use sector the utility sold to, as EIA reports it on Form EIA-861M: Residential, Commercial, Industrial, Transportation. EIA's Total column is the sum of these four and is not loaded.
+table Sector
+
+	/// Sector name. Primary key, related to 'Fact Retail Sales'[Sector]. Sorted Residential, Commercial, Industrial, Transportation.
+	column Sector
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Sector
+		sortByColumn: 'Sector Sort'
+
+	/// Sort order for Sector, in EIA's column order: 1 Residential, 2 Commercial, 3 Industrial, 4 Transportation.
+	column 'Sector Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Sector Sort
+
+	partition Sector = m
+		mode: import
+		source =
+			let
+				Source = #table(
+					type table [Sector = text, Sector Sort = Int64.Type],
+					{
+						{"Residential", 1},
+						{"Commercial", 2},
+						{"Industrial", 3},
+						{"Transportation", 4}
+					}
+				)
+			in
+				Source

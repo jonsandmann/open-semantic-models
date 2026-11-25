@@ -1,0 +1,31 @@
+relationship 'Fact Permit to Issue Date'
+	fromColumn: 'Fact Permit'.'Issued Date'
+	toColumn: 'Issue Date'.Date
+
+relationship 'Fact Permit to Apply Date'
+	fromColumn: 'Fact Permit'.'Applied Date'
+	toColumn: 'Apply Date'.Date
+
+relationship 'Fact Permit to Final Date'
+	fromColumn: 'Fact Permit'.'Final Date'
+	toColumn: 'Final Date'.Date
+
+relationship 'Fact Permit to Jurisdiction'
+	fromColumn: 'Fact Permit'.Jurisdiction
+	toColumn: Jurisdiction.Jurisdiction
+
+relationship 'Fact Permit to Category'
+	fromColumn: 'Fact Permit'.'Category Key'
+	toColumn: Category.'Category Key'
+
+relationship 'Fact Permit to Work Class'
+	fromColumn: 'Fact Permit'.'Work Class'
+	toColumn: 'Work Class'.'Work Class'
+
+relationship 'Fact Permit to Use Class'
+	fromColumn: 'Fact Permit'.'Use Class'
+	toColumn: 'Use Class'.'Use Class'
+
+relationship 'Fact Permit to Status'
+	fromColumn: 'Fact Permit'.Status
+	toColumn: Status.Status

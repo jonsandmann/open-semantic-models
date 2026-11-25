@@ -1,0 +1,28 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+	annotation __PBI_TimeIntelligenceEnabled = 0
+
+	annotation Attribution = Joined from ten open building-permit datasets (Seattle SDCI, NYC DOB, Chicago, San Francisco DBI, Los Angeles LADBS, Austin DSD, Boston ISD, Philadelphia L&I, New Orleans Safety & Permits, Montgomery County MD DPS). Population: Census Bureau Vintage 2024.
+
+	annotation PBI_QueryOrder = ["PermitsFolder","PermitFiles","Calendar","Fact Permit","Jurisdiction","Category","Work Class","Use Class","Status","Issue Date","Apply Date","Final Date"]
+
+ref table 'Fact Permit'
+ref table Jurisdiction
+ref table Category
+ref table 'Work Class'
+ref table 'Use Class'
+ref table Status
+ref table 'Issue Date'
+ref table 'Apply Date'
+ref table 'Final Date'
+
+ref expression PermitsFolder
+ref expression PermitFiles
+ref expression Calendar

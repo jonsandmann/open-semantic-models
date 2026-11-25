@@ -1,0 +1,220 @@
+/// Fact table: one row per permit as the city defines a permit (the data factory's permits.parquet). Housing Units Contribution already de-duplicates Austin related building permits that copy the same unit count under one master, includes Los Angeles mixed-use apartments filed as commercial, and is zero on every other category. Every column is hidden; analysis goes through the measures and the dimensions. Counts follow Issue Date unless the visual uses Apply Date or Final Date.
+table 'Fact Permit'
+
+	/// Permits in context, every category and jurisdiction. A permit is not the same unit everywhere (NYC issues one work permit per trade per job; Seattle's file holds no trades), so compare categories.
+	measure Permits = COUNTROWS ( 'Fact Permit' )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Net dwelling units on new homes, Census BPS convention (issue date). Austin related permits that copy the same unit count onto every building permit under one master (phases, fire areas, amenity buildings, identical descriptions on 2–4 permits) count once. Los Angeles mixed-use apartment buildings filed as Bldg-New Commercial Apartment are included. Boston, New Orleans and Montgomery County publish no usable unit counts (blank here). Alteration conversions are excluded, matching BPS.
+	measure 'Housing Units' = SUM ( 'Fact Permit'[Housing Units Contribution] )
+		formatString: #,0
+		displayFolder: Housing
+
+	/// Housing Units per 1,000 residents per year in context. Population is Census Vintage 2024 on Jurisdiction. The year count is distinct Issue Date years that have housing units, so a 2024–2025 Chicago slice divides by two.
+	measure 'Housing Units per 1,000 per Year' =
+			VAR Years = CALCULATE ( DISTINCTCOUNT ( 'Issue Date'[Year] ), 'Fact Permit'[Housing Units Contribution] <> 0 )
+			VAR Pop = MAX ( Jurisdiction[Population] )
+			VAR One = DISTINCTCOUNT ( Jurisdiction[Jurisdiction] ) = 1
+			RETURN
+				IF ( One, DIVIDE ( [Housing Units], Years * Pop ) * 1000 )
+		formatString: 0.00
+		displayFolder: Housing
+
+	/// Housing units on permits of 200 or more units. The numerator of Share of units in 200+ permits.
+	measure 'Units in 200+ Permits' = CALCULATE ( [Housing Units], KEEPFILTERS ( 'Fact Permit'[Units Added] >= 200 ) )
+		formatString: #,0
+		displayFolder: Housing
+
+	/// Share of Housing Units that sit on permits of 200 or more units (towers). New York 41% in 2023–2025; Los Angeles 4%.
+	measure 'Share of Units in 200+ Permits' = DIVIDE ( [Units in 200+ Permits], [Housing Units] )
+		formatString: 0%
+		displayFolder: Housing
+
+	/// Median calendar days from application to issue for rows that have both dates and issue on or after apply. FINDINGS.md reports this on new residential by issue year.
+	measure 'Median Days Apply to Issue' = MEDIAN ( 'Fact Permit'[Days Apply To Issue] )
+		formatString: #,0
+		displayFolder: Speed
+
+	/// Share of permits in context issued the same day they were filed (Days Apply To Issue = 0).
+	measure 'Same-Day Issue Share' = DIVIDE ( COALESCE ( CALCULATE ( [Permits], KEEPFILTERS ( 'Fact Permit'[Days Apply To Issue] = 0 ) ), 0 ), CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Days Apply To Issue] ) ) ) )
+		formatString: 0%
+		displayFolder: Speed
+
+	/// Declared job value, US dollars, excluding Austin (the field is copied onto trades and is unusable) and values outside 1 .. 2 billion (NYC $1,000 placeholders and a handful of overflows). Philadelphia publishes none. Self-declared and nominal; within-city trends are sounder than cross-city levels.
+	measure 'Valuation USD' = SUM ( 'Fact Permit'[Valuation Usable] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Value
+
+	/// New-construction declared value: Valuation USD on new residential and new non-residential only.
+	measure 'New Construction Valuation' = CALCULATE ( [Valuation USD], KEEPFILTERS ( Category[Work Class] = "new" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Value
+
+	/// Last issue date in context, used by the prior-year measures.
+	measure 'Last Issue Date' = MAX ( 'Fact Permit'[Issued Date] )
+		isHidden
+		formatString: yyyy-mm-dd
+		displayFolder: Time
+
+	/// Permits in the same Issue Date period one year earlier, through the last loaded issue date.
+	measure 'Permits Prior Year' =
+			VAR LastDay = [Last Issue Date]
+			RETURN
+				CALCULATE ( [Permits], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Issue Date'[Date] ), 'Issue Date'[Date] <= LastDay ) ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Year-over-year change in Permits. Blank when the current value is blank.
+	measure 'Permits YoY %' = DIVIDE ( [Permits] - [Permits Prior Year], [Permits Prior Year] )
+		formatString: 0.0%
+		displayFolder: Time
+
+	/// Housing Units in the same Issue Date period one year earlier.
+	measure 'Housing Units Prior Year' =
+			VAR LastDay = [Last Issue Date]
+			RETURN
+				CALCULATE ( [Housing Units], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Issue Date'[Date] ), 'Issue Date'[Date] <= LastDay ) ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Year-over-year change in Housing Units. Blank when the current value is blank.
+	measure 'Housing Units YoY %' = DIVIDE ( [Housing Units] - [Housing Units Prior Year], [Housing Units Prior Year] )
+		formatString: 0.0%
+		displayFolder: Time
+
+	/// Permits that have an application date in context (Apply Date). Boston and Philadelphia publish issued permits only.
+	measure Applications = CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Applied Date] ) ) )
+		formatString: #,0
+		displayFolder: Pipeline
+
+	/// Permits that have a final / certificate date in context (Final Date). Recent years are incomplete by construction.
+	measure 'Finaled Permits' = CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Final Date] ) ) )
+		formatString: #,0
+		displayFolder: Pipeline
+
+	/// Required attribution for reports built from this model.
+	measure Attribution = "Joined from ten open building-permit datasets (Seattle SDCI, NYC DOB, Chicago, San Francisco DBI, Los Angeles LADBS, Austin DSD, Boston ISD, Philadelphia L&I, New Orleans Safety & Permits, Montgomery County MD DPS). Population: Census Bureau Vintage 2024. See each Jurisdiction[Licence]."
+		formatString: @
+		displayFolder: About
+
+	/// Jurisdiction and source permit number, unique across the ten cities.
+	column 'Permit Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Permit Key
+
+	/// Jurisdiction name, related to Jurisdiction.
+	column Jurisdiction
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Jurisdiction
+
+	/// Category code, related to Category.
+	column 'Category Key'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Category Key
+
+	/// Work class, related to Work Class.
+	column 'Work Class'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Work Class
+
+	/// Use class, related to Use Class.
+	column 'Use Class'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Use Class
+
+	/// Status, related to Status.
+	column Status
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Status
+
+	/// Application / filing date, related to Apply Date.
+	column 'Applied Date'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Applied Date
+
+	/// Permit issued date, related to Issue Date. Headline counts use this date.
+	column 'Issued Date'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Issued Date
+
+	/// Final / certificate date, related to Final Date.
+	column 'Final Date'
+		isAvailableInMdx: false
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		summarizeBy: none
+		sourceColumn: Final Date
+
+	/// Net dwelling units the source published on this permit. Can repeat across Austin related permits; do not SUM this. Use Housing Units.
+	column 'Units Added'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: #,0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Units Added
+
+	/// Dwelling units this row contributes to Housing Units after Austin de-duplication and Los Angeles mixed-use inclusion.
+	column 'Housing Units Contribution'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: #,0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Housing Units Contribution
+
+	/// Declared value included in Valuation USD (blank for Austin and for values outside 1 .. 2e9).
+	column 'Valuation Usable'
+		isAvailableInMdx: false
+		dataType: decimal
+		formatString: \$#,0;(\$#,0);\$#,0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Valuation Usable
+
+	/// Issued date minus applied date, only when both exist and issue is on or after apply.
+	column 'Days Apply To Issue'
+		isAvailableInMdx: false
+		dataType: int64
+		formatString: #,0
+		isHidden
+		summarizeBy: none
+		sourceColumn: Days Apply To Issue
+
+	partition 'Fact Permit' = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(PermitFiles{[Name = "permits.parquet"]}[Content]),
+					Renamed = Table.RenameColumns(Raw, {{"permit_key", "Permit Key"}, {"jurisdiction", "Jurisdiction"}, {"category_key", "Category Key"}, {"work_class", "Work Class"}, {"use_class", "Use Class"}, {"status", "Status"}, {"applied_date", "Applied Date"}, {"issued_date", "Issued Date"}, {"final_date", "Final Date"}, {"units_added", "Units Added"}, {"housing_units", "Housing Units Contribution"}, {"valuation_usable", "Valuation Usable"}, {"days_apply_to_issue", "Days Apply To Issue"}}),
+					Typed = Table.TransformColumnTypes(Renamed, {{"Permit Key", type text}, {"Jurisdiction", type text}, {"Category Key", type text}, {"Work Class", type text}, {"Use Class", type text}, {"Status", type text}, {"Applied Date", type date}, {"Issued Date", type date}, {"Final Date", type date}, {"Units Added", Int64.Type}, {"Housing Units Contribution", Int64.Type}, {"Valuation Usable", Currency.Type}, {"Days Apply To Issue", Int64.Type}})
+				in
+					Typed

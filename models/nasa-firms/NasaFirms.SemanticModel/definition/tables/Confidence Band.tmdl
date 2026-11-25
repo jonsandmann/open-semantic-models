@@ -1,0 +1,22 @@
+/// Detection confidence on one scale for both instruments: VIIRS l, n, h become Low, Nominal, High; MODIS 0 to 100 becomes Low under 30, Nominal 30 to 79, High 80 and over.
+table 'Confidence Band'
+
+	/// Low, Nominal or High. Primary key, related to 'Fact Detection'[Confidence Band].
+	column 'Confidence Band'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Confidence Band
+		sortByColumn: 'Band Sort'
+
+	/// Sort order: 1 Low, 2 Nominal, 3 High.
+	column 'Band Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Band Sort
+
+	partition 'Confidence Band' = m
+		mode: import
+		source = #table(type table [Confidence Band = text, Band Sort = Int64.Type], {{"Low", 1}, {"Nominal", 2}, {"High", 3}})

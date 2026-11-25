@@ -1,0 +1,34 @@
+/// TPEP provider (technology vendor) that supplied the trip record, per the TLC data dictionary.
+table Vendor
+
+	/// TLC VendorID. Primary key, related to Trips[Vendor ID].
+	column 'Vendor ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Vendor ID
+
+	/// Provider name, for example Curb Mobility.
+	column Vendor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Vendor
+
+	partition Vendor = m
+		mode: import
+		source =
+			let
+				// Codes from the TLC Yellow Taxi data dictionary (March 2025).
+				Source = #table(
+					type table [Vendor ID = Int64.Type, Vendor = text],
+					{
+						{1, "Creative Mobile Technologies"},
+						{2, "Curb Mobility"},
+						{6, "Myle Technologies"},
+						{7, "Helix"}
+					}
+				)
+			in
+				Source

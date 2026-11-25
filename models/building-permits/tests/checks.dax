@@ -1,0 +1,100 @@
+-- Q1 how much is loaded
+EVALUATE ROW (
+    "permits", [Permits],
+    "housing_units", [Housing Units]
+)
+
+-- Q2 Austin 2023-2025 housing units per 1,000 per year
+EVALUATE
+CALCULATETABLE (
+    ROW ( "per1000", [Housing Units per 1,000 per Year], "units", [Housing Units] ),
+    Jurisdiction[Jurisdiction] = "Austin, TX",
+    'Issue Date'[Year] IN { 2023, 2024, 2025 }
+)
+
+-- Q3 median days apply to issue, new residential, issue year 2025, SF and Montgomery
+EVALUATE
+CALCULATETABLE (
+    SUMMARIZECOLUMNS (
+        Jurisdiction[Jurisdiction],
+        "median_days", [Median Days Apply to Issue]
+    ),
+    Category[Category Key] = "new_residential",
+    'Issue Date'[Year] = 2025,
+    Jurisdiction[Jurisdiction] IN { "San Francisco, CA", "Montgomery County, MD" }
+)
+
+-- Q4 NYC housing units Jan-Oct 2025 and 2026
+EVALUATE
+ROW (
+    "u2025", CALCULATE ( [Housing Units], Jurisdiction[Jurisdiction] = "New York, NY", DATESBETWEEN ( 'Issue Date'[Date], DATE ( 2025, 1, 1 ), DATE ( 2025, 10, 31 ) ) ),
+    "u2026", CALCULATE ( [Housing Units], Jurisdiction[Jurisdiction] = "New York, NY", DATESBETWEEN ( 'Issue Date'[Date], DATE ( 2026, 1, 1 ), DATE ( 2026, 10, 31 ) ) )
+)
+
+-- Q5 Seattle housing units Jan-Sep 2025 and 2026
+EVALUATE
+ROW (
+    "u2025", CALCULATE ( [Housing Units], Jurisdiction[Jurisdiction] = "Seattle, WA", DATESBETWEEN ( 'Issue Date'[Date], DATE ( 2025, 1, 1 ), DATE ( 2025, 9, 30 ) ) ),
+    "u2026", CALCULATE ( [Housing Units], Jurisdiction[Jurisdiction] = "Seattle, WA", DATESBETWEEN ( 'Issue Date'[Date], DATE ( 2026, 1, 1 ), DATE ( 2026, 9, 30 ) ) )
+)
+
+-- Q6 Los Angeles housing units 2023-2025 including mixed-use apartments
+EVALUATE
+CALCULATETABLE (
+    ROW ( "units", [Housing Units] ),
+    Jurisdiction[Jurisdiction] = "Los Angeles, CA",
+    'Issue Date'[Year] IN { 2023, 2024, 2025 }
+)
+
+-- Q7 Chicago new construction valuation 2023 and 2025
+EVALUATE
+ROW (
+    "v2023", CALCULATE ( [New Construction Valuation], Jurisdiction[Jurisdiction] = "Chicago, IL", 'Issue Date'[Year] = 2023 ),
+    "v2025", CALCULATE ( [New Construction Valuation], Jurisdiction[Jurisdiction] = "Chicago, IL", 'Issue Date'[Year] = 2025 )
+)
+
+-- Q8 NYC share of units in 200+ permits, new residential 2023-2025
+EVALUATE
+CALCULATETABLE (
+    ROW ( "units", [Housing Units], "share200", [Share of Units in 200+ Permits], "u200", [Units in 200+ Permits] ),
+    Jurisdiction[Jurisdiction] = "New York, NY",
+    Category[Category Key] = "new_residential",
+    'Issue Date'[Year] IN { 2023, 2024, 2025 },
+    'Fact Permit'[Units Added] > 0
+)
+
+-- Q9 Los Angeles housing units per 1,000 per year 2023-2025
+EVALUATE
+CALCULATETABLE (
+    ROW ( "per1000", [Housing Units per 1,000 per Year] ),
+    Jurisdiction[Jurisdiction] = "Los Angeles, CA",
+    'Issue Date'[Year] IN { 2023, 2024, 2025 }
+)
+
+-- Q10 Seattle new-residential applications Jan-Oct 2025 and 2026 (Apply Date role)
+EVALUATE
+ROW (
+    "a2025", CALCULATE ( [Applications], Jurisdiction[Jurisdiction] = "Seattle, WA", Category[Category Key] = "new_residential", DATESBETWEEN ( 'Apply Date'[Date], DATE ( 2025, 1, 1 ), DATE ( 2025, 10, 31 ) ) ),
+    "a2026", CALCULATE ( [Applications], Jurisdiction[Jurisdiction] = "Seattle, WA", Category[Category Key] = "new_residential", DATESBETWEEN ( 'Apply Date'[Date], DATE ( 2026, 1, 1 ), DATE ( 2026, 10, 31 ) ) )
+)
+
+-- All measures evaluate with no filter
+EVALUATE
+ROW (
+    "Permits", [Permits],
+    "Housing Units", [Housing Units],
+    "Housing Units per 1,000 per Year", [Housing Units per 1,000 per Year],
+    "Units in 200+ Permits", [Units in 200+ Permits],
+    "Share of Units in 200+ Permits", [Share of Units in 200+ Permits],
+    "Median Days Apply to Issue", [Median Days Apply to Issue],
+    "Same-Day Issue Share", [Same-Day Issue Share],
+    "Valuation USD", [Valuation USD],
+    "New Construction Valuation", [New Construction Valuation],
+    "Permits Prior Year", [Permits Prior Year],
+    "Permits YoY %", [Permits YoY %],
+    "Housing Units Prior Year", [Housing Units Prior Year],
+    "Housing Units YoY %", [Housing Units YoY %],
+    "Applications", [Applications],
+    "Finaled Permits", [Finaled Permits],
+    "Attribution", [Attribution]
+)

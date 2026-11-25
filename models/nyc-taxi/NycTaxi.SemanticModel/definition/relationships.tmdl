@@ -1,0 +1,27 @@
+relationship 'Trips to Date'
+	fromColumn: Trips.'Pickup Date'
+	toColumn: Date.Date
+
+relationship 'Trips to Time of Day'
+	fromColumn: Trips.'Pickup Hour'
+	toColumn: 'Time of Day'.Hour
+
+relationship 'Trips to Pickup Zone'
+	fromColumn: Trips.'Pickup Location ID'
+	toColumn: 'Pickup Zone'.'Pickup Location ID'
+
+relationship 'Trips to Dropoff Zone'
+	fromColumn: Trips.'Dropoff Location ID'
+	toColumn: 'Dropoff Zone'.'Dropoff Location ID'
+
+relationship 'Trips to Vendor'
+	fromColumn: Trips.'Vendor ID'
+	toColumn: Vendor.'Vendor ID'
+
+relationship 'Trips to Rate Code'
+	fromColumn: Trips.'Rate Code ID'
+	toColumn: 'Rate Code'.'Rate Code ID'
+
+relationship 'Trips to Payment Type'
+	fromColumn: Trips.'Payment Type ID'
+	toColumn: 'Payment Type'.'Payment Type ID'

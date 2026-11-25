@@ -1,0 +1,41 @@
+/// Where NOAA files the event: the 50 states and the District of Columbia, the territories (Puerto Rico, Virgin Islands, Guam, American Samoa), and marine areas (Atlantic North and South, Gulf of Mexico, the Great Lakes, Gulf of Alaska, E Pacific and others). A marine area is not part of any state. Built from the states present in the loaded files.
+table State
+
+	/// State, territory or marine area name as NOAA publishes it (upper case), for example MISSOURI or GULF OF MEXICO. Primary key, related to 'Fact Event'[State].
+	column State
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: State
+
+	/// NOAA's state code for the area: the US FIPS code for states and DC (1 to 56), and NOAA's own codes for territories (96 to 99) and marine areas (81 to 95).
+	column 'State FIPS'
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: State FIPS
+
+	/// State (50 states and DC), Territory (Puerto Rico, Virgin Islands, Guam, American Samoa) or Marine (open water and the Great Lakes).
+	column 'Geography Kind'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Geography Kind
+		sortByColumn: 'Geography Kind Sort'
+
+	/// Sort order for Geography Kind: 1 State, 2 Territory, 3 Marine.
+	column 'Geography Kind Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Geography Kind Sort
+
+	partition State = m
+		mode: import
+		source =
+			let
+				Source = Table.Distinct(Table.SelectColumns(StormDetails, {"State", "State FIPS"}), {"State"}),
+				Kind = Table.AddColumn(Source, "Geography Kind", each if [State FIPS] <= 56 then "State" else if List.Contains({96, 97, 98, 99}, [State FIPS]) then "Territory" else "Marine", type text),
+				Sorted = Table.AddColumn(Kind, "Geography Kind Sort", each if [Geography Kind] = "State" then 1 else if [Geography Kind] = "Territory" then 2 else 3, Int64.Type)
+			in
+				Sorted

@@ -1,0 +1,128 @@
+// Acceptance checks run against the deployed model through the executeQueries REST API (tools/dax_checks.py).
+// Q1 to Q10 are the business questions in README.md, pinned to the 12 Nov 2026 catalog release.
+
+// 1. Q1 Acute care hospitals: rated, five star, one star (expected 3,094 hospitals; 2,654 rated; 290 five star, 10.93%; 175 one star)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Hospitals", [Hospitals], "Rated", [Hospitals rated], "Five star", [Five star hospitals], "Five star share", [Five star share], "One star", [One star hospitals] ),
+    Hospital[Hospital Type] = "Acute Care Hospitals"
+)
+
+// 2. Q2 California acute care hospitals with five stars (expected 25 of 257 rated)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Five star", [Five star hospitals], "Rated", [Hospitals rated] ),
+    Hospital[Hospital Type] = "Acute Care Hospitals", Hospital[State Code] = "CA"
+)
+
+// 3. Q3 Mean stars, rated New York acute care hospitals (expected 2.7049 on 122)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Average stars", [Average stars], "Rated", [Hospitals rated] ),
+    Hospital[Hospital Type] = "Acute Care Hospitals", Hospital[State Code] = "NY"
+)
+
+// 4. Q4 Highest one-star share among states with at least 20 rated acute care hospitals (expected MS 11 of 46, 23.91%; WV next, 4 of 21)
+EVALUATE
+CALCULATETABLE (
+    TOPN (
+        2,
+        FILTER (
+            ADDCOLUMNS ( VALUES ( Hospital[State Code] ), "One star", [One star hospitals], "Rated", [Hospitals rated], "One star share", [One star share] ),
+            [Rated] >= 20
+        ),
+        [One star share], DESC
+    ),
+    Hospital[Hospital Type] = "Acute Care Hospitals"
+)
+
+// 5. Q5 Heart-attack death rate MORT_30_AMI (expected unweighted 11.8302 on 1,933; weighted 11.7536; 4,787 Not Available comparisons; window 2022-07-01 to 2025-06-30)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Average score", [Average score], "Reported scores", [Reported scores], "Weighted", [Denominator weighted score],
+        "Not available to compare", [Not available to compare],
+        "Window start", MIN ( 'Fact Measure Result'[Start Date] ), "Window end", MAX ( 'Fact Measure Result'[End Date] )
+    ),
+    'Quality Measure'[Measure ID] = "MORT_30_AMI"
+)
+
+// 6. Q6 Southeast Health Medical Center 010001 (expected rating 4; AMI 13.5 on 234; hip/knee 3.8 on 33, Not Available)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS (
+        VALUES ( 'Quality Measure'[Measure ID] ),
+        "Stars", [Average stars], "Score", [Average score], "Cases", [Total denominator],
+        "Comparison", CALCULATE ( SELECTEDVALUE ( 'Fact Measure Result'[Compared to National] ) )
+    ),
+    Hospital[Facility ID] = "010001", 'Quality Measure'[Measure ID] IN { "MORT_30_AMI", "COMP_HIP_KNEE" }
+)
+
+// 7. Q7 ISCMR comparison (expected 272 worse, 152 better, 1,892 no different, 1,993 Not Available, 478 too small; window 2023-07-01 to 2025-06-30)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Worse", [Worse than national], "Better", [Better than national], "No different", [No different than national],
+        "Not available", [Not available to compare], "Too small", [Too small to compare],
+        "Window start", MIN ( 'Fact Measure Result'[Start Date] ), "Window end", MAX ( 'Fact Measure Result'[End Date] )
+    ),
+    'Quality Measure'[Measure ID] = "ISCMR"
+)
+
+// 8. Q8 PSI 90 composite (expected 139 worse, 61 better, 2,589 no different; mean 0.9941 on 2,789; window 2023-07-01 to 2025-06-30)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Worse", [Worse than national], "Better", [Better than national], "No different", [No different than national],
+        "Average score", [Average score], "Reported scores", [Reported scores],
+        "Window start", MIN ( 'Fact Measure Result'[Start Date] ), "Window end", MAX ( 'Fact Measure Result'[End Date] )
+    ),
+    'Quality Measure'[Measure ID] = "PSI_90"
+)
+
+// 9. Q9 Pressure-ulcer rate PSI_03 (expected 157 worse, 39 better, 2,733 no different)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Worse", [Worse than national], "Better", [Better than national], "No different", [No different than national] ),
+    'Quality Measure'[Measure ID] = "PSI_03"
+)
+
+// 10. Q10 Birthing-friendly acute care hospitals (expected 2,035 of 3,094)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Birthing friendly", [Birthing friendly hospitals], "Hospitals", [Hospitals] ),
+    Hospital[Hospital Type] = "Acute Care Hospitals"
+)
+
+// 11. Load and referential integrity (expected 95,740 results, 5,435 hospitals, 20 quality measures, release 2026-11-12, zero orphans, Average score blank across measures)
+EVALUATE
+ROW (
+    "Results", [Results],
+    "Rating rows", COUNTROWS ( 'Fact Overall Rating' ),
+    "Hospitals", [Hospitals],
+    "Quality measures", COUNTROWS ( 'Quality Measure' ),
+    "Latest release", [Latest release date],
+    "Average score all measures", [Average score],
+    "No hospital (results)", COUNTROWS ( FILTER ( 'Fact Measure Result', ISBLANK ( RELATED ( Hospital[Facility Name] ) ) ) ),
+    "No measure", COUNTROWS ( FILTER ( 'Fact Measure Result', ISBLANK ( RELATED ( 'Quality Measure'[Family] ) ) ) ),
+    "No end date", COUNTROWS ( FILTER ( 'Fact Measure Result', ISBLANK ( RELATED ( 'Performance Date'[Year] ) ) ) ),
+    "No hospital (ratings)", COUNTROWS ( FILTER ( 'Fact Overall Rating', ISBLANK ( RELATED ( Hospital[Facility Name] ) ) ) ),
+    "No release date (ratings)", COUNTROWS ( FILTER ( 'Fact Overall Rating', ISBLANK ( RELATED ( 'Release Date'[Year] ) ) ) ),
+    "No release date (results)", COUNTROWS ( FILTER ( 'Fact Measure Result', ISBLANK ( RELATED ( 'Release Date'[Year] ) ) ) ),
+    "By window start 2022", CALCULATE ( [Results by window start], 'Performance Date'[Year] = 2022 ),
+    "By release 2026", CALCULATE ( [Results by release], 'Release Date'[Year] = 2026, 'Performance Date'[Year] = 2024 )
+)
+
+// 12. Families and measure order (expected Mortality 7 incl. Hybrid_HWM, Surgical complication 2, Patient safety 11)
+EVALUATE
+SUMMARIZECOLUMNS ( 'Quality Measure'[Family Sort], 'Quality Measure'[Family], "Measures", COUNTROWS ( 'Quality Measure' ), "Results", [Results], "Share worse", [Share worse] )
+
+// 13. Role-playing dates (expected: a Performance Date slicer filters results and leaves stars whole; a Release Date slicer filters both. Performance year 2025: 95,740 results, 4,787 hospitals with a result, 3,166 rated; performance year 2024: no results, still 3,166 rated; release year 2026: 95,740 results, 3,166 rated; release year 2025: both blank)
+EVALUATE
+ADDCOLUMNS (
+    { ( "Performance 2025", 1 ), ( "Performance 2024", 2 ), ( "Release 2026", 3 ), ( "Release 2025", 4 ) },
+    "Results", SWITCH ( [Value2], 1, CALCULATE ( [Results], 'Performance Date'[Year] = 2025 ), 2, CALCULATE ( [Results], 'Performance Date'[Year] = 2024 ), 3, CALCULATE ( [Results], 'Release Date'[Year] = 2026 ), 4, CALCULATE ( [Results], 'Release Date'[Year] = 2025 ) ),
+    "Hospitals with a result", SWITCH ( [Value2], 1, CALCULATE ( [Hospitals with a result], 'Performance Date'[Year] = 2025 ), 2, CALCULATE ( [Hospitals with a result], 'Performance Date'[Year] = 2024 ), 3, CALCULATE ( [Hospitals with a result], 'Release Date'[Year] = 2026 ), 4, CALCULATE ( [Hospitals with a result], 'Release Date'[Year] = 2025 ) ),
+    "Hospitals rated", SWITCH ( [Value2], 1, CALCULATE ( [Hospitals rated], 'Performance Date'[Year] = 2025 ), 2, CALCULATE ( [Hospitals rated], 'Performance Date'[Year] = 2024 ), 3, CALCULATE ( [Hospitals rated], 'Release Date'[Year] = 2026 ), 4, CALCULATE ( [Hospitals rated], 'Release Date'[Year] = 2025 ) ),
+    "Average score AMI", SWITCH ( [Value2], 1, CALCULATE ( [Average score], 'Performance Date'[Year] = 2025, 'Quality Measure'[Measure ID] = "MORT_30_AMI" ), 3, CALCULATE ( [Average score], 'Release Date'[Year] = 2026, 'Quality Measure'[Measure ID] = "MORT_30_AMI" ) )
+)

@@ -1,0 +1,34 @@
+/// The three FIRMS active-fire products. Each sees the same fires on its own overpasses, so their detections are never added: a pixel that all three see is three rows. Every measure in the Detections, FRP and Time folders reads VIIRS NOAA-20 when no source is picked, one source when one is picked, and blank when two or three are.
+table Source
+
+	/// VIIRS NOAA-20, VIIRS S-NPP or MODIS. Primary key, related to 'Fact Detection'[Source].
+	column Source
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Source
+		sortByColumn: 'Source Sort'
+
+	/// VIIRS (375 m) or MODIS (1 km).
+	column Instrument
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Instrument
+
+	/// Nominal pixel size at nadir, 375 m or 1 km. A label: never multiply it by detections (overpasses overlap and pixels grow off nadir).
+	column Pixel
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Pixel
+
+	/// Sort order: 1 VIIRS NOAA-20 (the default product), 2 VIIRS S-NPP, 3 MODIS.
+	column 'Source Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Source Sort
+
+	partition Source = m
+		mode: import
+		source = #table(type table [Source = text, Instrument = text, Pixel = text, Source Sort = Int64.Type], {{"VIIRS NOAA-20", "VIIRS", "375 m", 1}, {"VIIRS S-NPP", "VIIRS", "375 m", 2}, {"MODIS", "MODIS", "1 km", 3}})

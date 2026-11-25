@@ -1,0 +1,41 @@
+/// Taxi zone where the meter was disengaged (dropoff). Role-playing copy of the TLC zone lookup (265 zones), loaded from the shared TaxiZoneLookup query.
+table 'Dropoff Zone'
+
+	/// TLC LocationID of the dropoff zone. Primary key, related to Trips[Dropoff Location ID].
+	column 'Dropoff Location ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Dropoff Location ID
+
+	/// Borough of the dropoff zone: Manhattan, Brooklyn, Queens, Bronx, Staten Island, EWR, or Unknown/N/A.
+	column 'Dropoff Borough'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Dropoff Borough
+
+	/// Name of the dropoff taxi zone, for example JFK Airport or Upper East Side South.
+	column 'Dropoff Zone Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Dropoff Zone Name
+
+	/// TLC service zone of the dropoff: Yellow Zone (Manhattan core), Boro Zone, Airports, or EWR.
+	column 'Dropoff Service Zone'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Dropoff Service Zone
+
+	partition 'Dropoff Zone' = m
+		mode: import
+		source =
+			let
+				Source = TaxiZoneLookup,
+				Renamed = Table.RenameColumns(
+					Source,
+					{{"Location ID", "Dropoff Location ID"}, {"Borough", "Dropoff Borough"}, {"Zone", "Dropoff Zone Name"}, {"Service Zone", "Dropoff Service Zone"}}
+				)
+			in
+				Renamed

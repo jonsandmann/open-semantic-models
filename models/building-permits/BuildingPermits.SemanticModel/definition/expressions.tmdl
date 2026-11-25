@@ -1,0 +1,34 @@
+/// Folder holding the model's slim Parquet (permits.parquet: the factory join plus Housing Units Contribution). The dataset has no public URL, so the file is copied to a lake folder. The default is the Semantic Models Lab workspace's PermitsData lakehouse. To read a folder on disk in Power BI Desktop, change the one connector line in PermitFiles to Folder.Files ( PermitsFolder ) and set this to the local path.
+expression PermitsFolder = "https://onelake.dfs.fabric.microsoft.com/<workspace-id>/<lakehouse-id>/Files/permits" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// Shared query, not loaded: the files in PermitsFolder (Name and Content). The only connector in the model.
+expression PermitFiles =
+		let
+			Files = AzureStorage.DataLake(PermitsFolder, [HierarchicalNavigation = false]),
+			Kept = Table.SelectColumns(Files, {"Name", "Content"})
+		in
+			Kept
+	annotation PBI_ResultType = Table
+
+/// Shared query, not loaded: one calendar day per row from 1 January 2022 to 31 December 2026. Issue dates in the factory window start in 2023; a handful of 2022 issue/apply dates are kept. Loaded by Issue Date, Apply Date and Final Date. Dates outside this span are blanked in the slim Parquet so they do not orphan.
+expression Calendar =
+		let
+			CalendarStart = #date(2022, 1, 1),
+			CalendarEnd = #date(2026, 12, 31),
+			DayCount = Duration.Days(CalendarEnd - CalendarStart) + 1,
+			Dates = List.Dates(CalendarStart, DayCount, #duration(1, 0, 0, 0)),
+			Base = Table.FromList(Dates, Splitter.SplitByNothing(), type table [Date = date]),
+			AddYear = Table.AddColumn(Base, "Year", each Date.Year([Date]), Int64.Type),
+			AddQuarterNumber = Table.AddColumn(AddYear, "Quarter Number", each Date.QuarterOfYear([Date]), Int64.Type),
+			AddQuarter = Table.AddColumn(AddQuarterNumber, "Quarter", each "Q" & Text.From([Quarter Number]), type text),
+			AddYearQuarter = Table.AddColumn(AddQuarter, "Year Quarter", each Text.From([Year]) & " Q" & Text.From([Quarter Number]), type text),
+			AddYearQuarterNumber = Table.AddColumn(AddYearQuarter, "Year Quarter Number", each [Year] * 10 + [Quarter Number], Int64.Type),
+			AddMonthNumber = Table.AddColumn(AddYearQuarterNumber, "Month Number", each Date.Month([Date]), Int64.Type),
+			AddMonth = Table.AddColumn(AddMonthNumber, "Month", each Date.ToText([Date], [Format = "MMMM", Culture = "en-US"]), type text),
+			AddMonthShort = Table.AddColumn(AddMonth, "Month Short", each Date.ToText([Date], [Format = "MMM", Culture = "en-US"]), type text),
+			AddYearMonth = Table.AddColumn(AddMonthShort, "Year Month", each Text.From([Year]) & "-" & Text.PadStart(Text.From([Month Number]), 2, "0"), type text),
+			AddYearMonthSort = Table.AddColumn(AddYearMonth, "Year Month Sort", each [Year] * 100 + [Month Number], Int64.Type),
+			AddMonthStart = Table.AddColumn(AddYearMonthSort, "Month Start", each Date.StartOfMonth([Date]), type date)
+		in
+			AddMonthStart
+	annotation PBI_ResultType = Table

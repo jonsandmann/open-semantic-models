@@ -1,0 +1,35 @@
+/// HM Land Registry Price Paid monthly update file (CSV, no header, about 17 MB), Open Government Licence v3.0. The full file URL is the Web data source, so the service's credential test reads a URL that answers 200 (the bare host answers 403). Swap in pp-complete.csv or a yearly file for history; the shaping is the same. Contains HM Land Registry data © Crown copyright and database right 2026. This data is licensed under the Open Government Licence v3.0.
+expression PricePaidUrl = "https://price-paid-data.publicdata.landregistry.gov.uk/pp-monthly-update-new-version.csv" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// First day of the Date table: 1 January 1995, the first year Price Paid covers.
+expression CalendarStart = #date(1995, 1, 1) meta [IsParameterQuery = true, Type = "Date", IsParameterQueryRequired = true]
+
+/// Last day of the Date table: 31 December of the current year at refresh time, so the calendar holds whole years.
+expression CalendarEnd = Date.EndOfYear(Date.From(DateTime.FixedLocalNow()))
+
+/// Shared query, not loaded: the Price Paid file as one row per transaction id, with no address-level field. Postcode, PAON, SAON, street and locality (columns 4 and 8 to 11) are never selected: Land Registry's address fields come from Ordnance Survey AddressBase, which the Open Government Licence does not cover, and they identify homes. Town, district and county are the only geography kept. Feeds Fact Sale and Location.
+expression PricePaid =
+		let
+			Source = Csv.Document(Web.Contents(PricePaidUrl), [Delimiter = ",", Columns = 16, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+			// Keep only these columns by position; postcode (4), PAON (8), SAON (9), street (10) and locality (11) never leave this step.
+			Keep = Table.SelectColumns(Source, {"Column1", "Column2", "Column3", "Column5", "Column6", "Column7", "Column12", "Column13", "Column14", "Column15", "Column16"}),
+			Named = Table.RenameColumns(Keep, {
+				{"Column1", "Transaction ID"}, {"Column2", "Price Text"}, {"Column3", "Transfer Text"},
+				{"Column5", "Property Type Code"}, {"Column6", "Old New"}, {"Column7", "Duration Code"},
+				{"Column12", "Town"}, {"Column13", "District"}, {"Column14", "County"},
+				{"Column15", "Category Code"}, {"Column16", "Status Code"}
+			}),
+			// Transfer datetime is "YYYY-MM-DD 00:00"; the time is always midnight, so only the date is kept.
+			Dated = Table.AddColumn(Named, "Transfer Date", each Date.FromText(Text.Start([Transfer Text], 10), [Format = "yyyy-MM-dd", Culture = "en-US"]), type date),
+			Priced = Table.AddColumn(Dated, "Price GBP", each Number.FromText([Price Text], "en-US"), Int64.Type),
+			Built = Table.AddColumn(Priced, "Build", each if [Old New] = "Y" then "New build" else "Established", type text),
+			Categorised = Table.AddColumn(Built, "Category", each if [Category Code] = "A" then "Standard" else "Additional", type text),
+			Statused = Table.AddColumn(Categorised, "Record Status", each if [Status Code] = "A" then "Added" else if [Status Code] = "C" then "Changed" else if [Status Code] = "D" then "Deleted" else "Other", type text),
+			// Standard Price Paid (category A) and not a delete: the rows every price and sales measure reads.
+			Flagged = Table.AddColumn(Statused, "Is Standard Sale", each [Category Code] = "A" and [Status Code] <> "D", type logical),
+			Located = Table.AddColumn(Flagged, "Location Key", each [District] & "|" & [Town], type text),
+			Result = Table.SelectColumns(Located, {"Transaction ID", "Transfer Date", "Price GBP", "Property Type Code", "Duration Code", "Build", "Category", "Record Status", "Is Standard Sale", "Location Key", "Town", "District", "County"}),
+			Typed = Table.TransformColumnTypes(Result, {{"Transaction ID", type text}, {"Property Type Code", type text}, {"Duration Code", type text}, {"Town", type text}, {"District", type text}, {"County", type text}})
+		in
+			Typed
+	annotation PBI_ResultType = Table

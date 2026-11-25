@@ -1,0 +1,11 @@
+relationship 'Fact Retail Sales to Date'
+	fromColumn: 'Fact Retail Sales'.Date
+	toColumn: Date.Date
+
+relationship 'Fact Retail Sales to Kind'
+	fromColumn: 'Fact Retail Sales'.'Kind Key'
+	toColumn: Kind.'Kind Key'
+
+relationship 'Fact Retail Sales to Adjustment'
+	fromColumn: 'Fact Retail Sales'.Adjustment
+	toColumn: Adjustment.Adjustment

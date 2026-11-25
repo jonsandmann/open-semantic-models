@@ -1,0 +1,90 @@
+/// Root of NASA FIRMS (LANCE) on the web. The one Web data source: the file index and every country CSV are read with RelativePath under data/country/, because the service's credential test calls the root and only the root answers 200 (data/country/ answers 404). No MAP_KEY or Earthdata login is needed for the country files.
+expression FirmsBaseUrl = "https://firms.modaps.eosdis.nasa.gov/" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// Countries to load, comma-separated, as FIRMS names them in the file names (underscores for spaces, for example Portugal or United_States). Each country file is already clipped to the country.
+expression Countries = "Portugal" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// First calendar year to load. Default 2024, so 2025 has a prior year to compare with.
+expression FirstYear = 2024 meta [IsParameterQuery = true, Type = "Number", IsParameterQueryRequired = true]
+
+/// Last calendar year to load. Default 2025, the latest full year in the country archive.
+expression LastYear = 2025 meta [IsParameterQuery = true, Type = "Number", IsParameterQueryRequired = true]
+
+/// Shared query, not loaded: every detection in the country yearly files for the three products (VIIRS NOAA-20 viirs-jpss1, VIIRS S-NPP viirs-snpp, MODIS modis), countries and years in the parameters, listed from FIRMS's yearly_summary_files.txt. Source is tagged from the file's product, not from the instrument column (both VIIRS files say VIIRS). The confidence band puts VIIRS l/n/h and MODIS 0 to 100 on one scale. Feeds Fact Detection and Country.
+expression FirmsDetections =
+		let
+			Index = Table.PromoteHeaders(Csv.Document(Web.Contents(FirmsBaseUrl, [RelativePath = "data/country/yearly_summary_files.txt"]), [Delimiter = ",", Encoding = 65001]), [PromoteAllScalars = true]),
+			Products = {"viirs-jpss1", "viirs-snpp", "modis"},
+			CountryList = List.Transform(Text.Split(Countries, ","), Text.Trim),
+			SourceOf = (product as text) as text => if product = "viirs-jpss1" then "VIIRS NOAA-20" else if product = "viirs-snpp" then "VIIRS S-NPP" else "MODIS",
+			Parsed = Table.AddColumn(Index, "Parts", each Text.Split(Text.BeforeDelimiter([filename], ".csv"), "_")),
+			Wanted = Table.SelectRows(Parsed, each
+				Text.EndsWith([filename], ".csv") and List.Count([Parts]) >= 3
+				and List.Contains(Products, [Parts]{0})
+				and (try Number.FromText([Parts]{1}) otherwise 0) >= FirstYear and (try Number.FromText([Parts]{1}) otherwise 0) <= LastYear
+				and List.Contains(CountryList, Text.Combine(List.Skip([Parts], 2), "_"))),
+			ReadOne = (file as text) as table =>
+				let
+					Parts = Text.Split(Text.BeforeDelimiter(file, ".csv"), "_"),
+					Product = Parts{0},
+					Year = Parts{1},
+					Country = Text.Replace(Text.Combine(List.Skip(Parts, 2), "_"), "_", " "),
+					Csv = Csv.Document(Web.Contents(FirmsBaseUrl, [RelativePath = "data/country/" & Product & "/" & Year & "/" & file]), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+					Promoted = Table.PromoteHeaders(Csv, [PromoteAllScalars = true]),
+					// VIIRS calls the brightness columns bright_ti4/bright_ti5, MODIS brightness/bright_t31.
+					Renamed = Table.RenameColumns(Promoted, {{"bright_ti4", "brightness"}}, MissingField.Ignore),
+					Kept = Table.SelectColumns(Renamed, {"latitude", "longitude", "brightness", "acq_date", "acq_time", "satellite", "instrument", "confidence", "frp", "daynight", "type"}),
+					Tagged = Table.AddColumn(Table.AddColumn(Kept, "Source", each SourceOf(Product), type text), "Country", each Country, type text)
+				in
+					Tagged,
+			Stacked = Table.Combine(List.Transform(Wanted[filename], ReadOne)),
+			Num = (t as nullable text) as nullable number => if t = null or Text.Trim(t) = "" then null else Number.FromText(Text.Trim(t), "en-US"),
+			Shaped = Table.FromRecords(Table.TransformRows(Stacked, (r) => [
+				Detection Key = r[Source] & "|" & r[acq_date] & "|" & r[acq_time] & "|" & r[latitude] & "|" & r[longitude],
+				Acq Date = Date.FromText(r[acq_date], [Format = "yyyy-MM-dd", Culture = "en-US"]),
+				Acq Time = Text.PadStart(r[acq_time], 4, "0"),
+				Source = r[Source],
+				Satellite = r[satellite],
+				Country = r[Country],
+				Latitude = Num(r[latitude]),
+				Longitude = Num(r[longitude]),
+				FRP = Num(r[frp]),
+				Confidence = r[confidence],
+				Confidence Band =
+					if r[instrument] = "VIIRS" then (if r[confidence] = "h" then "High" else if r[confidence] = "n" then "Nominal" else if r[confidence] = "l" then "Low" else null)
+					else let n = Num(r[confidence]) in if n = null then null else if n >= 80 then "High" else if n >= 30 then "Nominal" else "Low",
+				Day Night = if r[daynight] = "D" then "Day" else if r[daynight] = "N" then "Night" else null,
+				Type Code = r[type],
+				Brightness = Num(r[brightness])
+			])),
+			Typed = Table.TransformColumnTypes(Shaped, {
+				{"Detection Key", type text}, {"Acq Date", type date}, {"Acq Time", type text}, {"Source", type text}, {"Satellite", type text}, {"Country", type text},
+				{"Latitude", Currency.Type}, {"Longitude", Currency.Type}, {"FRP", Currency.Type}, {"Confidence", type text}, {"Confidence Band", type text},
+				{"Day Night", type text}, {"Type Code", type text}, {"Brightness", Currency.Type}
+			})
+		in
+			Typed
+	annotation PBI_ResultType = Table
+
+/// Shared query, not loaded: one calendar day per row from 1 January FirstYear to 31 December LastYear, with year, quarter and month labels. Loaded by the Date table.
+expression Calendar =
+		let
+			CalendarStart = #date(FirstYear, 1, 1),
+			CalendarEnd = #date(LastYear, 12, 31),
+			DayCount = Duration.Days(CalendarEnd - CalendarStart) + 1,
+			Dates = List.Dates(CalendarStart, DayCount, #duration(1, 0, 0, 0)),
+			Base = Table.FromList(Dates, Splitter.SplitByNothing(), type table [Date = date]),
+			AddYear = Table.AddColumn(Base, "Year", each Date.Year([Date]), Int64.Type),
+			AddQuarterNumber = Table.AddColumn(AddYear, "Quarter Number", each Date.QuarterOfYear([Date]), Int64.Type),
+			AddQuarter = Table.AddColumn(AddQuarterNumber, "Quarter", each "Q" & Text.From([Quarter Number]), type text),
+			AddYearQuarter = Table.AddColumn(AddQuarter, "Year Quarter", each Text.From([Year]) & " Q" & Text.From([Quarter Number]), type text),
+			AddYearQuarterNumber = Table.AddColumn(AddYearQuarter, "Year Quarter Number", each [Year] * 10 + [Quarter Number], Int64.Type),
+			AddMonthNumber = Table.AddColumn(AddYearQuarterNumber, "Month Number", each Date.Month([Date]), Int64.Type),
+			AddMonth = Table.AddColumn(AddMonthNumber, "Month", each Date.ToText([Date], [Format = "MMMM", Culture = "en-US"]), type text),
+			AddMonthShort = Table.AddColumn(AddMonth, "Month Short", each Date.ToText([Date], [Format = "MMM", Culture = "en-US"]), type text),
+			AddYearMonth = Table.AddColumn(AddMonthShort, "Year Month", each Text.From([Year]) & "-" & Text.PadStart(Text.From([Month Number]), 2, "0"), type text),
+			AddYearMonthSort = Table.AddColumn(AddYearMonth, "Year Month Sort", each [Year] * 100 + [Month Number], Int64.Type),
+			AddMonthStart = Table.AddColumn(AddYearMonthSort, "Month Start", each Date.StartOfMonth([Date]), type date)
+		in
+			AddMonthStart
+	annotation PBI_ResultType = Table

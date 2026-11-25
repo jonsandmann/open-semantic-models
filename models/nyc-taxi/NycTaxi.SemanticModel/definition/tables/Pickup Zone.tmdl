@@ -1,0 +1,41 @@
+/// Taxi zone where the meter was engaged (pickup). Role-playing copy of the TLC zone lookup (265 zones), loaded from the shared TaxiZoneLookup query.
+table 'Pickup Zone'
+
+	/// TLC LocationID of the pickup zone. Primary key, related to Trips[Pickup Location ID].
+	column 'Pickup Location ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Pickup Location ID
+
+	/// Borough of the pickup zone: Manhattan, Brooklyn, Queens, Bronx, Staten Island, EWR, or Unknown/N/A.
+	column 'Pickup Borough'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Pickup Borough
+
+	/// Name of the pickup taxi zone, for example JFK Airport or Upper East Side South.
+	column 'Pickup Zone Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Pickup Zone Name
+
+	/// TLC service zone of the pickup: Yellow Zone (Manhattan core), Boro Zone, Airports, or EWR.
+	column 'Pickup Service Zone'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Pickup Service Zone
+
+	partition 'Pickup Zone' = m
+		mode: import
+		source =
+			let
+				Source = TaxiZoneLookup,
+				Renamed = Table.RenameColumns(
+					Source,
+					{{"Location ID", "Pickup Location ID"}, {"Borough", "Pickup Borough"}, {"Zone", "Pickup Zone Name"}, {"Service Zone", "Pickup Service Zone"}}
+				)
+			in
+				Renamed

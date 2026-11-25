@@ -1,0 +1,43 @@
+/// Each jurisdiction's own violation codes (NYC 02G, Chicago item numbers, King County 2120, FDA Food Code sections, California code sections, Toronto bylaw sections, Montgomery's compliance columns) with one description each. One row per jurisdiction and code.
+table 'Violation Code'
+
+	/// Jurisdiction and code joined with |. Primary key, related to 'Fact Violation'[Violation Code Key].
+	column 'Violation Code Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Violation Code Key
+
+	/// Jurisdiction id of the code. Codes are never shared across jurisdictions.
+	column 'Code Jurisdiction'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Code Jurisdiction
+
+	/// The publisher's code; (no code) for the Toronto infractions published without one.
+	column Code
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Code
+
+	/// The first description published for the code, cut at 300 characters (Marin's are free-text inspector notes, so its first note stands for the code).
+	column 'Code Description'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Code Description
+
+	partition 'Violation Code' = m
+		mode: import
+		source =
+				let
+					Raw = Table.SelectColumns(Parquet.Document(InspectionFiles{[Name = "violations.parquet"]}[Content]), {"source", "code", "description"}),
+					Grouped = Table.Group(Raw, {"source", "code"}, {{"Description", each List.First(List.RemoveNulls([description])), type nullable text}}),
+					Keyed = Table.AddColumn(Grouped, "Violation Code Key", each [source] & "|" & (if [code] = null then "" else [code]), type text),
+					Shaped = Table.FromColumns({
+						Keyed[Violation Code Key], Keyed[source],
+						List.Transform(Keyed[code], each if _ = null then "(no code)" else _),
+						List.Transform(Keyed[Description], each if _ = null then null else Text.Start(_, 300))
+					}, type table [Violation Code Key = text, Code Jurisdiction = text, Code = text, Code Description = nullable text])
+				in
+					Shaped

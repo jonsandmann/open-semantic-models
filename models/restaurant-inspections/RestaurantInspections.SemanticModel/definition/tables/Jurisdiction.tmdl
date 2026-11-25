@@ -1,0 +1,90 @@
+/// The ten jurisdictions joined, each with its rulebook: how it scores, what its own worst verdict ("fail") means, and what it calls a critical violation. Read these before comparing any published outcome across jurisdictions: a Boston fail, a King County Unsatisfactory and a Toronto closure are different events, and Toronto's critical (crucial plus significant) is wider than NYC's. Static table written from the data factory's SOURCES.md and schema.md (24 Nov 2026).
+table Jurisdiction
+
+	/// Source id used throughout the data factory (nyc, chicago, king_county, austin, montgomery, delaware, marin, ny_state, boston, toronto). Primary key, related to 'Fact Inspection'[Jurisdiction Key].
+	column 'Jurisdiction Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Jurisdiction Key
+
+	/// Jurisdiction name, for example New York City or King County, WA (Seattle).
+	column Jurisdiction
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Jurisdiction
+
+	/// Country: United States or Canada (Toronto, the outside comparator).
+	column Country
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Country
+
+	/// The inspecting agency and dataset.
+	column Publisher
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Publisher
+
+	/// The jurisdiction's own scoring system: points and letter grades, pass/fail verdicts, placards, a 100-point score, or none.
+	column 'Scoring System'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Scoring System
+
+	/// What the jurisdiction's own worst verdict means, the event mapped to outcome tier 3. In Boston, King County and Chicago it is a fail with a re-inspection ordered; in Toronto and Marin it is a closure; NYC publishes no fail (tier 3 is a C grade, a closure, or an ungraded initial inspection over 27 points).
+	column 'Fail Means'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fail Means
+
+	/// What counts as a critical violation here, published by the jurisdiction or derived from the category where none is published.
+	column 'Critical Means'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Critical Means
+
+	/// True when the jurisdiction publishes individual violations. Austin publishes a score only, so it is left out of every per-inspection violation measure.
+	column 'Publishes Violations'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Publishes Violations
+
+	/// True when the jurisdiction publishes a verdict that maps to an outcome tier. Delaware and New York State publish none, so they have no published outcome.
+	column 'Publishes Verdict'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Publishes Verdict
+
+	/// First month the data factory holds for this jurisdiction (several portals keep a rolling window), so a year-on-year comparison before it is partial.
+	column 'Data From'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Data From
+
+	/// Licence of the published dataset, as verified on 24 Nov 2026.
+	column Licence
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Licence
+
+	partition Jurisdiction = m
+		mode: import
+		source =
+				#table(
+					type table [Jurisdiction Key = text, Jurisdiction = text, Country = text, Publisher = text, Scoring System = text, Fail Means = text, Critical Means = text, Publishes Violations = logical, Publishes Verdict = logical, Data From = date, Licence = text],
+					{
+						{"nyc", "New York City", "United States", "NYC DOHMH, Restaurant Inspection Results (43nn-pn8j)", "Points, lower is better: 0-13 A, 14-27 B, 28+ C; the letter is posted only after a graded inspection", "No published fail. Tier 3 = a C grade, 28+ points on an ungraded initial inspection, or a closure by DOHMH", "Published Critical flag (the narrowest definition of the ten)", true, true, #date(2023, 1, 1), "NYC Open Data terms, no restrictions"},
+						{"chicago", "Chicago", "United States", "Chicago CDPH, Food Inspections (4ijn-s7e5)", "Pass / Pass w/ Conditions / Fail on the FDA form", "Fail: violations to correct, re-inspection ordered", "FDA form items 1-29 (risk factors and public-health interventions)", true, true, #date(2023, 1, 1), "City of Chicago Data Terms of Use"},
+						{"king_county", "King County, WA (Seattle)", "United States", "Public Health - Seattle & King County (r878-4sxa)", "Red (critical) and blue points; Satisfactory / Unsatisfactory", "Unsatisfactory: any red critical item; re-inspection ordered", "Published red violation type", true, true, #date(2023, 1, 1), "Public domain"},
+						{"austin", "Austin / Travis County, TX", "United States", "Austin Public Health (ecmv-9xxi)", "100-point deduction score: 90+ green, 70-89 yellow, under 70 red", "Score under 70", "No violations published", false, true, #date(2023, 11, 1), "Public domain"},
+						{"montgomery", "Montgomery County, MD", "United States", "Montgomery County HHS, Food Inspection Data from July 2024 (dkrp-gr48)", "Pass / Fail / Closed on a 16-item compliance form", "Fail or Closed", "Derived: the category is an FDA risk factor (no flag published)", true, true, #date(2024, 6, 1), "Public domain"},
+						{"delaware", "Delaware (state)", "United States", "Delaware Division of Public Health (384s-wygj)", "None published; violations cited by FDA Food Code section", "No verdict published", "Derived: the category is an FDA risk factor (no flag published)", true, false, #date(2024, 11, 1), "Public domain"},
+						{"marin", "Marin County, CA", "United States", "Marin County EHS (73zb-z5me)", "Placard: Green pass / Yellow conditional pass / Red closed", "Red placard: closed", "Published major violation flag", true, true, #date(2023, 1, 1), "Open Database License (ODbL), attribution and share-alike"},
+						{"ny_state", "New York State (outside NYC, district offices)", "United States", "NYSDOH, Food Service Establishment Inspections (2hcc-shji)", "None published; counts of critical and non-critical violations", "No verdict published", "Published critical violation flag", true, false, #date(2023, 1, 1), "OPEN-NY Terms of Use"},
+						{"boston", "Boston", "United States", "Boston ISD, Food Establishment Inspections", "Pass / Fail (HE_ codes); violation levels core, priority foundation, priority", "Fail (HE_Fail and its variants), a hearing, a permit suspension or a closure; in the published file every listed violation comes with a fail", "Published levels ** and *** (priority foundation and priority)", true, true, #date(2023, 1, 1), "Open Data Commons PDDL (public domain)"},
+						{"toronto", "Toronto, ON", "Canada", "Toronto Public Health, DineSafe", "Pass / Conditional Pass / Closed; infractions Minor / Significant / Crucial", "Closed. Toronto's re-inspection-ordered verdict is Conditional Pass (tier 2)", "Published Crucial and Significant (wider than NYC's Critical)", true, true, #date(2023, 11, 1), "Open Government Licence - Toronto, attribution required"}
+					}
+				)

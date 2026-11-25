@@ -1,0 +1,9 @@
+bin/
+obj/
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+.DS_Store
+
+
+samples/
+models/*/data/*.parquet

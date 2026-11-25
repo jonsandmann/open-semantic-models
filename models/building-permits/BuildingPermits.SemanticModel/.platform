@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "Building Permits"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "ba4a590d-f750-486c-b2ab-33f25ef3e7f4"
+  }
+}

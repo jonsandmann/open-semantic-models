@@ -1,0 +1,35 @@
+/// The four satellites behind the three products: NOAA-20 (VIIRS NOAA-20), Suomi NPP (VIIRS S-NPP), and Terra and Aqua, the morning and afternoon overpasses of the one MODIS product. Picking satellites counts as picking their sources: Terra and Aqua together are one source (MODIS); NOAA-20 with Terra is two, and the rule returns blank.
+table Satellite
+
+	/// FIRMS's satellite code: N20, N (Suomi NPP), Terra, Aqua. Primary key, related to 'Fact Detection'[Satellite].
+	column Satellite
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Satellite
+		sortByColumn: 'Satellite Sort'
+
+	/// Satellite name: NOAA-20, Suomi NPP, Terra or Aqua.
+	column 'Satellite Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Satellite Name
+		sortByColumn: 'Satellite Sort'
+
+	/// The product the satellite's detections belong to (same names as Source[Source]). The source rule reads it.
+	column Source
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Source
+
+	/// Sort order: NOAA-20, Suomi NPP, Terra, Aqua.
+	column 'Satellite Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Satellite Sort
+
+	partition Satellite = m
+		mode: import
+		source = #table(type table [Satellite = text, Satellite Name = text, Source = text, Satellite Sort = Int64.Type], {{"N20", "NOAA-20", "VIIRS NOAA-20", 1}, {"N", "Suomi NPP", "VIIRS S-NPP", 2}, {"Terra", "Terra", "MODIS", 3}, {"Aqua", "Aqua", "MODIS", 4}})

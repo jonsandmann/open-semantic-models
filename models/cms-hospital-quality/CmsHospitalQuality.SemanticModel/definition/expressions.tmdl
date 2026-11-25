@@ -1,0 +1,38 @@
+/// Root of the CMS Provider Data Catalog on data.cms.gov. Every query calls Web.Contents on this root with a RelativePath, so the service sees one static, anonymous Web data source whose root answers 200 (its credential test calls the root).
+expression CmsBaseUrl = "https://data.cms.gov/provider-data/" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// First day of the Performance Date and Release Date tables: 1 January 2022, the whole year that holds the earliest performance window in the file (1 July 2022).
+expression CalendarStart = #date(2022, 1, 1) meta [IsParameterQuery = true, Type = "Date", IsParameterQueryRequired = true]
+
+/// Last day of the Performance Date and Release Date tables: 31 December of the current year at refresh time, so the calendar holds whole years and always covers the latest catalog release.
+expression CalendarEnd = Date.EndOfYear(Date.From(DateTime.FixedLocalNow()))
+
+/// Shared query, not loaded: CMS Hospital General Information (dataset xubh-q36u), one row per hospital in the current catalog release, every field as text, plus the release date read from the dataset's metastore entry ("released"). Feeds the Hospital and Fact Overall Rating tables.
+expression GeneralInformation =
+		let
+			Raw = Csv.Document(
+				Web.Contents(CmsBaseUrl, [RelativePath = "api/1/datastore/query/xubh-q36u/0/download", Query = [format = "csv"]]),
+				[Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]
+			),
+			Promoted = Table.PromoteHeaders(Raw, [PromoteAllScalars = true]),
+			Meta = Json.Document(Web.Contents(CmsBaseUrl, [RelativePath = "api/1/metastore/schemas/dataset/items/xubh-q36u"])),
+			Released = Date.FromText(Meta[released], [Format = "yyyy-MM-dd", Culture = "en-US"]),
+			WithRelease = Table.AddColumn(Promoted, "Release Date", each Released, type date)
+		in
+			WithRelease
+	annotation PBI_ResultType = Table
+
+/// Shared query, not loaded: CMS Complications and Deaths - Hospital (dataset ynj2-r877), one row per hospital x measure in the current catalog release, every field as text, plus the release date read from the dataset's metastore entry ("released"). Feeds the Fact Measure Result and Quality Measure tables.
+expression ComplicationsAndDeaths =
+		let
+			Raw = Csv.Document(
+				Web.Contents(CmsBaseUrl, [RelativePath = "api/1/datastore/query/ynj2-r877/0/download", Query = [format = "csv"]]),
+				[Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]
+			),
+			Promoted = Table.PromoteHeaders(Raw, [PromoteAllScalars = true]),
+			Meta = Json.Document(Web.Contents(CmsBaseUrl, [RelativePath = "api/1/metastore/schemas/dataset/items/ynj2-r877"])),
+			Released = Date.FromText(Meta[released], [Format = "yyyy-MM-dd", Culture = "en-US"]),
+			WithRelease = Table.AddColumn(Promoted, "Release Date", each Released, type date)
+		in
+			WithRelease
+	annotation PBI_ResultType = Table

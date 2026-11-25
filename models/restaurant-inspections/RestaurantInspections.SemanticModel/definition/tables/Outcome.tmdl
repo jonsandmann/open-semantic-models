@@ -1,0 +1,64 @@
+/// Each jurisdiction's published verdict, mapped to the data factory's common outcome tier (1 passed, 2 passed with conditions or critical findings, 3 failed, closed or C grade) and flagged when it closed the establishment. The tier records each jurisdiction's own judgment, so it measures the rulebook as much as the kitchens: never compare tiers across jurisdictions without holding the findings constant (Critical Band). One row per jurisdiction, published result and tier.
+table Outcome
+
+	/// Jurisdiction, published result and tier joined with |. Primary key, related to 'Fact Inspection'[Outcome Key].
+	column 'Outcome Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Outcome Key
+
+	/// The jurisdiction's verdict text as published (NYC action, Chicago results, Boston HE_ code, Toronto status, Marin result code), or (none published) for Delaware and New York State.
+	column 'Published Result'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Published Result
+
+	/// Common outcome tier, 1 to 3; blank when the jurisdiction publishes no verdict or the visit had none (no entry, out of business, educational visit).
+	column Tier
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Tier
+
+	/// Tier label: 1 Passed; 2 Passed with conditions or critical findings; 3 Failed, closed or C grade; Not rated. Sorted by Tier Sort.
+	column 'Tier Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Tier Name
+		sortByColumn: 'Tier Sort'
+
+	/// Sort order of Tier Name (Not rated last).
+	column 'Tier Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Tier Sort
+
+	/// True when the verdict closed the establishment: NYC closed or re-closed by DOHMH, Boston HE_Closure, HE_VolClos (voluntary closure) and HE_TSOP (permit suspended), Toronto and Montgomery Closed, Marin's red placard. A closure is the one outcome that means the same thing everywhere.
+	column Closed
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Closed
+
+	partition Outcome = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(InspectionFiles{[Name = "inspections.parquet"]}[Content]),
+					Kept = Table.Distinct(Table.SelectColumns(Raw, {"source", "result_raw", "tier"})),
+					Keyed = Table.AddColumn(Kept, "Outcome Key", each [source] & "|" & (if [result_raw] = null then "" else [result_raw]) & "|" & (if [tier] = null then "" else Number.ToText([tier], "0")), type text),
+					Result = Table.AddColumn(Keyed, "Published Result", each if [result_raw] = null then "(none published)" else [result_raw], type text),
+					TierInt = Table.AddColumn(Result, "Tier", each if [tier] = null then null else Int64.From([tier]), Int64.Type),
+					TierName = Table.AddColumn(TierInt, "Tier Name", each if [Tier] = 1 then "1 Passed" else if [Tier] = 2 then "2 Passed with conditions or critical findings" else if [Tier] = 3 then "3 Failed, closed or C grade" else "Not rated", type text),
+					TierSort = Table.AddColumn(TierName, "Tier Sort", each if [Tier] = null then 4 else [Tier], Int64.Type),
+					Closed = Table.AddColumn(TierSort, "Closed", each
+						([source] = "nyc" and [result_raw] <> null and (Text.StartsWith([result_raw], "Establishment Closed") or Text.StartsWith([result_raw], "Establishment re-closed")))
+						or ([source] = "boston" and List.Contains({"HE_Closure", "HE_VolClos", "HE_TSOP"}, [result_raw]))
+						or (List.Contains({"toronto", "montgomery"}, [source]) and [result_raw] = "Closed")
+						or ([source] = "marin" and [Tier] = 3), type logical),
+					Final = Table.SelectColumns(Closed, {"Outcome Key", "Published Result", "Tier", "Tier Name", "Tier Sort", "Closed"})
+				in
+					Final

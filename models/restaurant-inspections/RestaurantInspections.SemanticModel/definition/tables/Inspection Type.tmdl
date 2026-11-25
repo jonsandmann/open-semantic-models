@@ -1,0 +1,29 @@
+/// The data factory's normalized inspection type. The cross-jurisdiction findings use Routine only. Boston and Toronto publish no type, so all their visits read Routine, follow-ups included: use Visit Kind to separate first visits from follow-ups.
+table 'Inspection Type'
+
+	/// Normalized type code: routine, reinspection, complaint, pre_opening, other. Primary key, related to 'Fact Inspection'[Inspection Type Key].
+	column 'Inspection Type Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Inspection Type Key
+
+	/// Inspection type: Routine, Re-inspection, Complaint, Pre-opening, Other. Sorted by Inspection Type Sort.
+	column 'Inspection Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Inspection Type
+		sortByColumn: 'Inspection Type Sort'
+
+	/// Sort order of Inspection Type.
+	column 'Inspection Type Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Inspection Type Sort
+
+	partition 'Inspection Type' = m
+		mode: import
+		source = #table(type table [Inspection Type Key = text, Inspection Type = text, Inspection Type Sort = Int64.Type], {{"routine", "Routine", 1}, {"reinspection", "Re-inspection", 2}, {"complaint", "Complaint", 3}, {"pre_opening", "Pre-opening", 4}, {"other", "Other", 5}})

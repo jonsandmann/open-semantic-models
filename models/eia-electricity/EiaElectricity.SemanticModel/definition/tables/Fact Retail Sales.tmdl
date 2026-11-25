@@ -1,0 +1,224 @@
+/// Fact table: electricity retail sales by utilities to end-use customers, from EIA Form EIA-861M (sheet Monthly-States of sales_revenue.xlsx). Grain: state (50 states and DC) x month x sector, four sectors; EIA's Total column is not loaded. Every column is hidden; analysis goes through the measures below and the Date, State and Sector dimensions.
+table 'Fact Retail Sales'
+
+	/// Dollars utilities billed retail customers for electricity (EIA publishes thousand dollars; the model stores dollars).
+	measure Revenue = SUM ( 'Fact Retail Sales'[Revenue Amount USD] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Sales
+
+	/// Kilowatthours of electricity sold to retail customers (EIA publishes megawatthours; the model stores kWh).
+	measure 'Sales kWh' = SUM ( 'Fact Retail Sales'[Sales Amount kWh] )
+		formatString: #,0
+		displayFolder: Sales
+
+	/// Retail sales in megawatthours, the unit EIA publishes. Same quantity as Sales kWh.
+	measure 'Sales MWh' = DIVIDE ( [Sales kWh], 1000 )
+		formatString: #,0.0
+		displayFolder: Sales
+
+	/// Customer accounts (meters billed) in the last month of the current filter context. Semi-additive: it adds across states and sectors but never across months, because the same account repeats every month.
+	measure Customers =
+			VAR LastMonth = MAX ( 'Fact Retail Sales'[Date] )
+			RETURN
+				CALCULATE ( SUM ( 'Fact Retail Sales'[Customer Count] ), 'Date'[Date] = LastMonth )
+		formatString: #,0
+		displayFolder: Sales
+
+	/// Average retail price in cents per kilowatthour: revenue divided by sales, recomputed from the sums (EIA's published price column is the same ratio per row, so averaging it would be wrong).
+	measure 'Price cents per kWh' = DIVIDE ( [Revenue], [Sales kWh] ) * 100
+		formatString: 0.00
+		displayFolder: Price
+
+	/// Customer accounts averaged over the months with data in the filter context: each month's accounts (added across states and sectors) averaged across months. Equals Customers for one month. The denominator of the per-customer measures, so a year divides by its average customer base, not December's.
+	measure 'Average customers' =
+			AVERAGEX ( VALUES ( 'Fact Retail Sales'[Date] ), CALCULATE ( SUM ( 'Fact Retail Sales'[Customer Count] ) ) )
+		formatString: #,0
+		displayFolder: Sales
+
+	/// Revenue per customer account: revenue in the filter context divided by Average customers. For one month it is the average monthly bill; for a whole year, the average annual bill; for a year in progress, the bill so far (Months in scope says how many months).
+	measure 'Revenue per customer' = DIVIDE ( [Revenue], [Average customers] )
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Price
+
+	/// Kilowatthours sold per customer account: sales in the filter context divided by Average customers. For one month it is average monthly use; for a whole year, annual use; for a year in progress, use so far (Months in scope says how many months).
+	measure 'Sales per customer kWh' = DIVIDE ( [Sales kWh], [Average customers] )
+		formatString: #,0.0
+		displayFolder: Price
+
+	/// Share of US retail sales (50 states and DC) in the current sector and period that the selected states account for. Sector and date filters stay; state filters are removed for the denominator.
+	measure 'Share of US sales' = DIVIDE ( [Sales kWh], CALCULATE ( [Sales kWh], ALL ( State ) ) )
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Share of the selected states' retail sales, across all four sectors, that the selected sectors account for.
+	measure 'Share of state sales' = DIVIDE ( [Sales kWh], CALCULATE ( [Sales kWh], ALL ( Sector ) ) )
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Retail sales year to date: January through the selected month of the same calendar year. Blank after the last month in the data.
+	measure 'Sales YTD kWh' = IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Sales kWh], 'Date'[Date] ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Revenue year to date: January through the selected month of the same calendar year. Blank after the last month in the data.
+	measure 'Revenue YTD' = IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Revenue], 'Date'[Date] ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Retail sales in the same period one year earlier, over the same months that have data now: for a year still in progress it is the prior year's same months, not the whole prior year, so the YoY measures compare like with like.
+	measure 'Sales prior year kWh' =
+			VAR LastDay = EOMONTH ( [Last Data Date], 0 )
+			RETURN
+				CALCULATE ( [Sales kWh], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Revenue in the same period one year earlier, over the same months that have data now: for a year still in progress it is the prior year's same months, not the whole prior year, so the YoY measures compare like with like.
+	measure 'Revenue prior year' =
+			VAR LastDay = EOMONTH ( [Last Data Date], 0 )
+			RETURN
+				CALCULATE ( [Revenue], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time
+
+	/// Average retail price in cents per kWh in the same period one year earlier, over the same months that have data now: for a year still in progress it is the prior year's same months, not the whole prior year, so the YoY measures compare like with like.
+	measure 'Price prior year cents per kWh' =
+			VAR LastDay = EOMONTH ( [Last Data Date], 0 )
+			RETURN
+				CALCULATE ( [Price cents per kWh], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: 0.00
+		displayFolder: Time
+
+	/// Change in retail sales against the same period a year earlier, as a percentage of the prior year.
+	measure 'Sales YoY %' = IF ( NOT ISBLANK ( [Sales kWh] ), DIVIDE ( [Sales kWh] - [Sales prior year kWh], [Sales prior year kWh] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Change in revenue against the same period a year earlier, as a percentage of the prior year.
+	measure 'Revenue YoY %' = IF ( NOT ISBLANK ( [Revenue] ), DIVIDE ( [Revenue] - [Revenue prior year], [Revenue prior year] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Change in average retail price against the same period a year earlier, in cents per kWh.
+	measure 'Price YoY cents' =
+			IF (
+				NOT ISBLANK ( [Price cents per kWh] ) && NOT ISBLANK ( [Price prior year cents per kWh] ),
+				[Price cents per kWh] - [Price prior year cents per kWh]
+			)
+		formatString: +0.00;-0.00;0.00
+		displayFolder: Time
+
+	/// Retail sales in the latest month that has data within the current filter context (the file is published with a lag, so this is not the calendar's last month).
+	measure 'Sales latest month kWh' =
+			VAR LastMonth = MAX ( 'Fact Retail Sales'[Date] )
+			RETURN
+				CALCULATE ( [Sales kWh], 'Date'[Date] = LastMonth )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Number of distinct months with data in the current filter context. A completeness check: a full year has 12.
+	measure 'Months in scope' = DISTINCTCOUNT ( 'Fact Retail Sales'[Date] )
+		formatString: 0
+		displayFolder: Audit
+
+	/// Months in the current filter context that EIA still marks Preliminary (estimates revised when the annual EIA-861 survey is final).
+	measure 'Preliminary months' = CALCULATE ( DISTINCTCOUNT ( 'Fact Retail Sales'[Date] ), KEEPFILTERS ( 'Fact Retail Sales'[Data Status] = "Preliminary" ) )
+		formatString: 0
+		displayFolder: Audit
+
+	/// First day of the latest month in the whole file, ignoring filters. Stops year-to-date measures at the data.
+	measure 'Last Data Date' = CALCULATE ( MAX ( 'Fact Retail Sales'[Date] ), REMOVEFILTERS () )
+		formatString: yyyy-mm-dd
+		isHidden
+		displayFolder: Audit
+
+	/// First day of the month the figures are for. Foreign key to 'Date'[Date].
+	column Date
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Date
+
+	/// Two-letter state code (50 states and DC). Foreign key to State[State Code].
+	column 'State Code'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: State Code
+
+	/// End-use sector: Residential, Commercial, Industrial or Transportation. Foreign key to Sector[Sector].
+	column Sector
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Sector
+
+	/// EIA's status for the row: Final, or Preliminary for recent months that are revised once the annual survey closes. Read through the Preliminary months measure.
+	column 'Data Status'
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Data Status
+
+	/// Retail revenue in dollars (EIA's thousand dollars x 1,000).
+	column 'Revenue Amount USD'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0;(\$#,0);\$#,0
+		summarizeBy: none
+		sourceColumn: Revenue Amount USD
+
+	/// Retail sales in kilowatthours (EIA's megawatthours x 1,000).
+	column 'Sales Amount kWh'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Sales Amount kWh
+
+	/// Customer accounts billed in the month. A monthly snapshot: never sum across months (the Customers measure takes the last month).
+	column 'Customer Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Customer Count
+
+	partition 'Fact Retail Sales' = m
+		mode: import
+		source =
+			let
+				Source = Excel.Workbook(Web.Contents(EiaBaseUrl, [RelativePath = "xls/sales_revenue.xlsx"]), null, true),
+				// Monthly-States only: the other sheets (territories, year-to-date, US) are aggregates and would double-count.
+				Sheet = Source{[Item = "Monthly-States", Kind = "Sheet"]}[Data],
+				// Rows 1 to 3 are the sector banner, the metric banner and the units; data starts on row 4.
+				Body = Table.Skip(Sheet, 3),
+				Cols = Table.ColumnNames(Body),
+				// The notes row at the bottom has text in the year column.
+				DataRows = Table.SelectRows(Body, each Record.Field(_, Cols{0}) is number),
+				// Each sector is four columns (revenue, sales, customers, price) starting at this zero-based position.
+				// The price column is skipped (recomputed by the measures); Total (positions 20 to 23) is not loaded.
+				Sectors = {{"Residential", 4}, {"Commercial", 8}, {"Industrial", 12}, {"Transportation", 16}},
+				OneSector = (s as list) as table =>
+					let
+						Picked = Table.SelectColumns(DataRows, {Cols{0}, Cols{1}, Cols{2}, Cols{3}, Cols{s{1}}, Cols{s{1} + 1}, Cols{s{1} + 2}}),
+						Named = Table.RenameColumns(
+							Picked,
+							List.Zip({Table.ColumnNames(Picked), {"Year", "Month", "State Code", "Data Status", "Revenue Thousand", "Sales MWh", "Customer Count"}})
+						),
+						Tagged = Table.AddColumn(Named, "Sector", each s{0}, type text)
+					in
+						Tagged,
+				Stacked = Table.Combine(List.Transform(Sectors, OneSector)),
+				Dated = Table.AddColumn(Stacked, "Date", each #date([Year], [Month], 1), type date),
+				Revenue = Table.AddColumn(Dated, "Revenue Amount USD", each [Revenue Thousand] * 1000, Currency.Type),
+				Sales = Table.AddColumn(Revenue, "Sales Amount kWh", each [Sales MWh] * 1000, Currency.Type),
+				Kept = Table.SelectColumns(Sales, {"Date", "State Code", "Sector", "Data Status", "Revenue Amount USD", "Sales Amount kWh", "Customer Count"}),
+				Typed = Table.TransformColumnTypes(Kept, {{"State Code", type text}, {"Data Status", type text}, {"Customer Count", Int64.Type}})
+			in
+				Typed

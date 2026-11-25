@@ -1,0 +1,132 @@
+// Acceptance checks run against the deployed model through the executeQueries REST API (tools/dax_checks.py).
+// Q1 to Q10 are the business questions in README.md: Portugal, 2024 and 2025, country archive files as of 24 Nov 2026.
+
+// 1. Q1 NOAA-20 detections by year, no source picked (expected 2024 12,010; 2025 13,862; satellites in scope 1)
+EVALUATE
+ROW (
+    "2024", CALCULATE ( [Detections], 'Date'[Year] = 2024 ),
+    "2025", CALCULATE ( [Detections], 'Date'[Year] = 2025 ),
+    "Satellites 2025", CALCULATE ( [Satellites in scope], 'Date'[Year] = 2025 )
+)
+
+// 2. Q2 Year on year, 2025 vs 2024 (expected prior year 12,010, +15.4%; FRP 339,014.73 vs 215,547.16, +57.3%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Detections", [Detections], "Prior year", [Detections prior year], "YoY", [Detections YoY %], "FRP", [Total FRP], "FRP prior year", [FRP prior year], "FRP YoY", [FRP YoY %] ),
+    'Date'[Year] = 2025
+)
+
+// 3. Q3 All three products picked, 2025 (expected Detections blank, Total FRP blank; audit rows 32,329; Detections in source blank)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Detections", [Detections], "FRP", [Total FRP], "In source", [Detections in source], "All product rows", [All product rows] ),
+    'Date'[Year] = 2025,
+    Source[Source] IN { "VIIRS NOAA-20", "VIIRS S-NPP", "MODIS" }
+)
+
+// 4. Q4 Peak UTC day (expected 2025-08-15 with 3,597 and FRP 126,836.80; 2024-09-17 with 5,399)
+EVALUATE
+ROW (
+    "Peak 2025", CALCULATE ( [Peak day], 'Date'[Year] = 2025 ),
+    "Peak 2025 detections", CALCULATE ( [Peak day detections], 'Date'[Year] = 2025 ),
+    "Peak 2025 FRP", CALCULATE ( [Total FRP], 'Date'[Date] = DATE ( 2025, 8, 15 ) ),
+    "Peak 2024", CALCULATE ( [Peak day], 'Date'[Year] = 2024 ),
+    "Peak 2024 detections", CALCULATE ( [Peak day detections], 'Date'[Year] = 2024 )
+)
+
+// 5. Q5 Months of 2025 (expected August 10,036 of 13,862, 72.4%)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( 'Date'[Year Month] ), "Detections", [Detections], "Share of year", DIVIDE ( [Detections], CALCULATE ( [Detections], REMOVEFILTERS ( 'Date'[Year Month] ) ) ) ),
+    'Date'[Year] = 2025
+)
+ORDER BY 'Date'[Year Month]
+
+// 6. Q6 and Q7 Confidence and day share, NOAA-20 2025 (expected high 1,935, 14.0%; nominal 11,135; low 792; day 6,414, 46.3%)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "High", [High confidence detections], "High share", [High confidence share],
+        "Nominal", CALCULATE ( [Detections], 'Confidence Band'[Confidence Band] = "Nominal" ),
+        "Low", [Low confidence detections], "Day share", [Day share],
+        "Day", CALCULATE ( [Detections], 'Day Night'[Day Night] = "Day" ), "Night", CALCULATE ( [Detections], 'Day Night'[Day Night] = "Night" )
+    ),
+    'Date'[Year] = 2025
+)
+
+// 7. Q8 Hotspot types, NOAA-20 2025 (expected vegetation 13,521 and FRP 338,615.76; static land 339; offshore 2)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Vegetation", [Vegetation detections], "Vegetation FRP", [Vegetation FRP], "Static land", [Static land detections], "Offshore", CALCULATE ( [Detections], 'Hotspot Type'[Type Code] = "3" ) ),
+    'Date'[Year] = 2025
+)
+
+// 8. Q9 S-NPP 2025 as its own source (expected 13,600; high 1,962, 14.4%; peak 2025-08-15 with 2,608)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Detections", [Detections], "High", [High confidence detections], "High share", [High confidence share], "Peak", [Peak day], "Peak detections", [Peak day detections] ),
+    'Date'[Year] = 2025,
+    Source[Source] = "VIIRS S-NPP"
+)
+
+// 9. Q10 MODIS 2025, Terra and Aqua together (expected 4,867; Terra 2,459; Aqua 2,408; FRP 700,319.20; average 143.89; high 3,166, 65.1%; satellites 2)
+EVALUATE
+ROW (
+    "MODIS", CALCULATE ( [Detections], 'Date'[Year] = 2025, Source[Source] = "MODIS" ),
+    "Terra", CALCULATE ( [Detections], 'Date'[Year] = 2025, Satellite[Satellite] = "Terra" ),
+    "Aqua", CALCULATE ( [Detections], 'Date'[Year] = 2025, Satellite[Satellite] = "Aqua" ),
+    "Terra+Aqua", CALCULATE ( [Detections], 'Date'[Year] = 2025, Satellite[Satellite] IN { "Terra", "Aqua" } ),
+    "N20+Terra", CALCULATE ( [Detections], 'Date'[Year] = 2025, Satellite[Satellite] IN { "N20", "Terra" } ),
+    "FRP", CALCULATE ( [Total FRP], 'Date'[Year] = 2025, Source[Source] = "MODIS" ),
+    "Average FRP", CALCULATE ( [Average FRP], 'Date'[Year] = 2025, Source[Source] = "MODIS" ),
+    "High", CALCULATE ( [High confidence detections], 'Date'[Year] = 2025, Source[Source] = "MODIS" ),
+    "High share", CALCULATE ( [High confidence share], 'Date'[Year] = 2025, Source[Source] = "MODIS" ),
+    "Satellites", CALCULATE ( [Satellites in scope], 'Date'[Year] = 2025, Source[Source] = "MODIS" )
+)
+
+// 10. Source matrix, 2025 (expected rows 13,862 / 13,600 / 4,867 in Detections in source; unfiltered Detections in source blank)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( Source[Source] ), "In source", [Detections in source], "Detections", [Detections] ),
+    'Date'[Year] = 2025
+)
+
+// 11. Time to date (expected YTD June 2025 773; YTD 2025 13,862; prior year for August 2025 699; Last Acq Date 2025-12-31)
+EVALUATE
+ROW (
+    "YTD 2025-06", CALCULATE ( [Detections YTD], 'Date'[Year Month] = "2025-06" ),
+    "YTD 2025", CALCULATE ( [Detections YTD], 'Date'[Year] = 2025 ),
+    "PY 2025-08", CALCULATE ( [Detections prior year], 'Date'[Year Month] = "2025-08" ),
+    "Unfiltered in source", [Detections in source],
+    "Unfiltered detections", [Detections],
+    "Last acq", [Last Acq Date]
+)
+
+// 12. Referential integrity (expected 59,568 rows, 0 orphans)
+EVALUATE
+ROW (
+    "Rows", COUNTROWS ( 'Fact Detection' ),
+    "Distinct keys", DISTINCTCOUNT ( 'Fact Detection'[Detection Key] ),
+    "No date", COUNTROWS ( FILTER ( 'Fact Detection', ISBLANK ( RELATED ( 'Date'[Date] ) ) ) ),
+    "No source", COUNTROWS ( FILTER ( 'Fact Detection', ISBLANK ( RELATED ( Source[Source] ) ) ) ),
+    "No satellite", COUNTROWS ( FILTER ( 'Fact Detection', ISBLANK ( RELATED ( Satellite[Satellite] ) ) ) ),
+    "No country", COUNTROWS ( FILTER ( 'Fact Detection', ISBLANK ( RELATED ( Country[Country] ) ) ) ),
+    "No band", COUNTROWS ( FILTER ( 'Fact Detection', ISBLANK ( RELATED ( 'Confidence Band'[Confidence Band] ) ) ) ),
+    "No day night", COUNTROWS ( FILTER ( 'Fact Detection', ISBLANK ( RELATED ( 'Day Night'[Day Night] ) ) ) ),
+    "No type", COUNTROWS ( FILTER ( 'Fact Detection', ISBLANK ( RELATED ( 'Hotspot Type'[Type Code] ) ) ) )
+)
+
+// 13. Every measure, 2025, no source picked (no errors)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Detections", [Detections], "Detections in source", [Detections in source], "Vegetation detections", [Vegetation detections],
+        "High confidence detections", [High confidence detections], "High confidence share", [High confidence share], "Day share", [Day share],
+        "Satellites in scope", [Satellites in scope], "Total FRP", [Total FRP], "Average FRP", [Average FRP], "Vegetation FRP", [Vegetation FRP],
+        "Last Acq Date", [Last Acq Date], "Detections YTD", [Detections YTD], "Detections prior year", [Detections prior year], "Detections YoY %", [Detections YoY %],
+        "FRP prior year", [FRP prior year], "FRP YoY %", [FRP YoY %], "Peak day", [Peak day], "Peak day detections", [Peak day detections],
+        "Static land detections", [Static land detections], "Low confidence detections", [Low confidence detections], "All product rows", [All product rows],
+        "Citation", [Citation], "Disclaimer", [Disclaimer]
+    ),
+    'Date'[Year] = 2025
+)

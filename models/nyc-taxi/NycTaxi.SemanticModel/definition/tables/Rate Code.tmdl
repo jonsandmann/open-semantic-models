@@ -1,0 +1,44 @@
+/// Final rate code in effect at the end of the trip, per the TLC data dictionary.
+table 'Rate Code'
+
+	/// TLC RatecodeID; 99 holds null or unknown codes. Primary key, related to Trips[Rate Code ID].
+	column 'Rate Code ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Rate Code ID
+
+	/// Rate code name: Standard, JFK, Newark, Nassau or Westchester, Negotiated, Group Ride, or Unknown. Sorted by Rate Code ID.
+	column 'Rate Code'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Rate Code
+		sortByColumn: 'Rate Code ID'
+
+	/// Standard metered rate versus flat or negotiated fares (JFK flat fare, Newark, negotiated, group).
+	column 'Fare Basis'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fare Basis
+
+	partition 'Rate Code' = m
+		mode: import
+		source =
+			let
+				// Codes from the TLC Yellow Taxi data dictionary (March 2025).
+				Source = #table(
+					type table [Rate Code ID = Int64.Type, Rate Code = text, Fare Basis = text],
+					{
+						{1, "Standard", "Metered"},
+						{2, "JFK", "Flat or negotiated"},
+						{3, "Newark", "Flat or negotiated"},
+						{4, "Nassau or Westchester", "Metered"},
+						{5, "Negotiated", "Flat or negotiated"},
+						{6, "Group Ride", "Flat or negotiated"},
+						{99, "Unknown", "Unknown"}
+					}
+				)
+			in
+				Source

@@ -1,0 +1,42 @@
+/// Land Registry's five property types. Other (O) covers property that is not one of the four house and flat types and appears only on additional (category B) transfers, so standard sales never show it.
+table 'Property Type'
+
+	/// Land Registry's code: D, S, T, F or O. Primary key, related to 'Fact Sale'[Property Type Code].
+	column 'Property Type Code'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Property Type Code
+
+	/// Detached, Semi-detached, Terraced, Flat or maisonette, Other. Sorted in that order.
+	column 'Property Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Property Type
+		sortByColumn: 'Property Type Sort'
+
+	/// Sort order for Property Type, 1 to 5.
+	column 'Property Type Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Property Type Sort
+
+	partition 'Property Type' = m
+		mode: import
+		source =
+			let
+				Source = #table(
+					type table [Property Type Code = text, Property Type = text, Property Type Sort = Int64.Type],
+					{
+						{"D", "Detached", 1},
+						{"S", "Semi-detached", 2},
+						{"T", "Terraced", 3},
+						{"F", "Flat or maisonette", 4},
+						{"O", "Other", 5}
+					}
+				)
+			in
+				Source

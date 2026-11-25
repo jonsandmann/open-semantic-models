@@ -1,0 +1,95 @@
+/// Issue calendar: the day the city said yes. Census BPS convention; FINDINGS.md counts by this date unless they say otherwise. Marked as a date table. A slicer here filters only this date role; Issue Date, Apply Date and Final Date are three calendars on the same days (CMS/NOAA role-playing lesson).
+table 'Issue Date'
+	dataCategory: Time
+
+	/// Calendar date. Primary key, related to 'Fact Permit'[Issued Date].
+	column Date
+		dataType: dateTime
+		isKey
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Date
+
+	/// Calendar year, for example 2026.
+	column Year
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year
+
+	/// Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+	column Quarter
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Quarter
+		sortByColumn: 'Quarter Number'
+
+	/// Quarter of the year as a number, 1 to 4.
+	column 'Quarter Number'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Quarter Number
+
+	/// Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+	column 'Year Quarter'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Year Quarter
+		sortByColumn: 'Year Quarter Number'
+
+	/// Sort key for Year Quarter: year times 10 plus quarter.
+	column 'Year Quarter Number'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year Quarter Number
+
+	/// Full month name, January to December. Sorted by Month Number.
+	column Month
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Month
+		sortByColumn: 'Month Number'
+
+	/// Abbreviated month name, Jan to Dec. Sorted by Month Number.
+	column 'Month Short'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Month Short
+		sortByColumn: 'Month Number'
+
+	/// Month of the year as a number, 1 to 12.
+	column 'Month Number'
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Month Number
+
+	/// Year and month as YYYY-MM. Sorted by Year Month Sort.
+	column 'Year Month'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Year Month
+		sortByColumn: 'Year Month Sort'
+
+	/// Sort key for Year Month: year times 100 plus month.
+	column 'Year Month Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Year Month Sort
+
+	/// First day of the month the date falls in.
+	column 'Month Start'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Month Start
+
+	partition 'Issue Date' = m
+		mode: import
+		source = Calendar

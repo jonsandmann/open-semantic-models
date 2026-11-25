@@ -1,0 +1,26 @@
+/// What the monthly update file does to each record: Added, Changed or Deleted. A delete withdraws an earlier record and is not a sale; the sales and price measures leave deletes out.
+table 'Record Status'
+
+	/// Added (A), Changed (C), Deleted (D), or Other for an unrecognised code. Primary key, related to 'Fact Sale'[Record Status].
+	column 'Record Status'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Record Status
+		sortByColumn: 'Record Status Sort'
+
+	/// Sort order for Record Status, 1 to 4.
+	column 'Record Status Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Record Status Sort
+
+	partition 'Record Status' = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [Record Status = text, Record Status Sort = Int64.Type], {{"Added", 1}, {"Changed", 2}, {"Deleted", 3}, {"Other", 4}})
+			in
+				Source

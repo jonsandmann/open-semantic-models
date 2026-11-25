@@ -1,0 +1,22 @@
+/// Whether a violation counts as critical. Each jurisdiction's own flag where it publishes one; Delaware and Montgomery publish none, so there a violation is critical when its category is an FDA risk factor (Jurisdiction[Critical Means]).
+table 'Critical Flag'
+
+	/// Critical or Not critical. Primary key, related to 'Fact Violation'[Critical Flag].
+	column 'Critical Flag'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Critical Flag
+		sortByColumn: 'Critical Flag Sort'
+
+	/// Sort order: Critical first.
+	column 'Critical Flag Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Critical Flag Sort
+
+	partition 'Critical Flag' = m
+		mode: import
+		source = #table(type table [Critical Flag = text, Critical Flag Sort = Int64.Type], {{"Critical", 1}, {"Not critical", 2}})

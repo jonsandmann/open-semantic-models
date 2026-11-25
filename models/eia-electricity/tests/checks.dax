@@ -1,0 +1,98 @@
+// Acceptance checks run against the deployed model through the executeQueries REST API (tools/dax_checks.py).
+// Q1 to Q10 are the business questions in README.md, pinned to August 2026 (the file grows each month).
+
+// 1. Q1 California residential, August 2026 (expected 11,160,409 MWh; $3,320,537,900; 14,138,808 customers; 29.75 c/kWh)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales MWh", [Sales MWh], "Revenue", [Revenue], "Customers", [Customers], "Price", [Price cents per kWh] ),
+    'Date'[Year Month] = "2026-08", State[State Code] = "CA", Sector[Sector] = "Residential"
+)
+
+// 2. Q2 US residential revenue, August 2026 (expected $30,455,229,710)
+EVALUATE
+CALCULATETABLE ( ROW ( "Revenue", [Revenue] ), 'Date'[Year Month] = "2026-08", Sector[Sector] = "Residential" )
+
+// 3. Q3 Washington commercial, August 2026 (expected 11.81 c/kWh; 2,955,812.7 MWh; $349,212,000; 408,477 customers)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Price", [Price cents per kWh], "Sales MWh", [Sales MWh], "Revenue", [Revenue], "Customers", [Customers] ),
+    'Date'[Year Month] = "2026-08", State[State Code] = "WA", Sector[Sector] = "Commercial"
+)
+
+// 4. Q4 California all sectors, August 2026 vs August 2025 (expected 26,720,654.69 vs 24,383,435.14 MWh; +9.585%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales MWh", [Sales MWh], "Prior year MWh", DIVIDE ( [Sales prior year kWh], 1000 ), "Sales YoY %", [Sales YoY %] ),
+    'Date'[Year Month] = "2026-08", State[State Code] = "CA"
+)
+
+// 5. Q5 Texas share of US industrial sales, August 2026 (expected 15.868%)
+EVALUATE
+CALCULATETABLE ( ROW ( "Share of US sales", [Share of US sales] ), 'Date'[Year Month] = "2026-08", State[State Code] = "TX", Sector[Sector] = "Industrial" )
+
+// 6. Q6 California residential sales year to date through August 2026 (expected 58,930,561.1 MWh)
+EVALUATE
+CALCULATETABLE ( ROW ( "Sales YTD MWh", DIVIDE ( [Sales YTD kWh], 1000 ) ), 'Date'[Year Month] = "2026-08", State[State Code] = "CA", Sector[Sector] = "Residential" )
+
+// 7. Q7 Highest state residential price, August 2026 (expected Hawaii, 47.18 c/kWh on 257,565.21 MWh)
+EVALUATE
+CALCULATETABLE (
+    TOPN ( 1, ADDCOLUMNS ( VALUES ( State[State Name] ), "Price", [Price cents per kWh], "Sales MWh", [Sales MWh] ), [Price], DESC ),
+    'Date'[Year Month] = "2026-08", Sector[Sector] = "Residential"
+)
+
+// 8. Q8 US commercial customers, August 2026 (expected 19,658,797)
+EVALUATE
+CALCULATETABLE ( ROW ( "Customers", [Customers] ), 'Date'[Year Month] = "2026-08", Sector[Sector] = "Commercial" )
+
+// 9. Q9 US transportation sales, August 2026 (expected 603,959.78 MWh)
+EVALUATE
+CALCULATETABLE ( ROW ( "Sales MWh", [Sales MWh] ), 'Date'[Year Month] = "2026-08", Sector[Sector] = "Transportation" )
+
+// 10. Q10 Alaska all sectors, August 2026 (expected 25.32 c/kWh; $124,600,400; 492,109.63 MWh; 365,040 customers)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Price", [Price cents per kWh], "Revenue", [Revenue], "Sales MWh", [Sales MWh], "Customers", [Customers] ),
+    'Date'[Year Month] = "2026-08", State[State Code] = "AK"
+)
+
+// 11. Load and referential integrity (expected 40,800 rows, 200 months, 8 preliminary months (January to August 2026), zero orphans)
+EVALUATE
+ROW (
+    "Rows", COUNTROWS ( 'Fact Retail Sales' ),
+    "Months", [Months in scope],
+    "Preliminary months", [Preliminary months],
+    "Last data date", [Last Data Date],
+    "No Date", COUNTROWS ( FILTER ( 'Fact Retail Sales', ISBLANK ( RELATED ( 'Date'[Year] ) ) ) ),
+    "No State", COUNTROWS ( FILTER ( 'Fact Retail Sales', ISBLANK ( RELATED ( State[State Name] ) ) ) ),
+    "No Sector", COUNTROWS ( FILTER ( 'Fact Retail Sales', ISBLANK ( RELATED ( Sector[Sector Sort] ) ) ) )
+)
+
+// 12. Time intelligence shape: California 2026 by month (YTD blank after August; customers never summed across months)
+EVALUATE
+CALCULATETABLE (
+    SUMMARIZECOLUMNS (
+        'Date'[Year Month Sort], 'Date'[Year Month],
+        "Sales MWh", [Sales MWh], "Sales YTD kWh", [Sales YTD kWh], "Revenue YoY %", [Revenue YoY %],
+        "Price YoY cents", [Price YoY cents], "Customers", [Customers]
+    ),
+    'Date'[Year] = 2026, State[State Code] = "CA"
+)
+ORDER BY 'Date'[Year Month Sort]
+
+// 13. Review fixes, 24 Nov (expected: Average customers = Customers for one month; 2025 revenue per customer = 2025 revenue / mean of the twelve monthly customer counts; 2026 prior year = the same months of 2025 as 2026 has data for, January to the last data month)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Customers Aug 2026", CALCULATE ( [Customers], 'Date'[Year Month] = "2026-08" ),
+        "Average customers Aug 2026", CALCULATE ( [Average customers], 'Date'[Year Month] = "2026-08" ),
+        "Revenue per customer 2025", CALCULATE ( [Revenue per customer], 'Date'[Year] = 2025 ),
+        "Revenue 2025 / mean monthly customers", CALCULATE ( DIVIDE ( [Revenue], AVERAGEX ( VALUES ( 'Date'[Year Month] ), [Customers] ) ), 'Date'[Year] = 2025 ),
+        "Revenue per customer Aug 2026", CALCULATE ( [Revenue per customer], 'Date'[Year Month] = "2026-08" ),
+        "Sales prior year 2026 MWh", CALCULATE ( DIVIDE ( [Sales prior year kWh], 1000 ), 'Date'[Year] = 2026 ),
+        "Sales same months of 2025 MWh", CALCULATE ( [Sales MWh], 'Date'[Year] = 2025, KEEPFILTERS ( FILTER ( ALL ( 'Date'[Month Number] ), 'Date'[Month Number] <= MONTH ( [Last Data Date] ) ) ) ),
+        "Sales all of 2025 MWh", CALCULATE ( [Sales MWh], 'Date'[Year] = 2025 ),
+        "Sales YoY 2026", CALCULATE ( [Sales YoY %], 'Date'[Year] = 2026 )
+    ),
+    State[State Code] = "CA", Sector[Sector] = "Residential"
+)

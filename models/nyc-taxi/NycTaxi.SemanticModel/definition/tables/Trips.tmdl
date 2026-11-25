@@ -1,0 +1,580 @@
+/// Fact table: one row per yellow taxi trip reported by a TPEP provider to the NYC Taxi & Limousine Commission. Grain: trip. Every column is hidden; analysis goes through the measures below and the conformed dimensions.
+table Trips
+
+	/// Number of trips. The base count every other trip measure builds on.
+	measure Trips = COUNTROWS ( Trips )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Passengers reported by the driver. Trips with no passenger count (mostly Flex Fare) add nothing.
+	measure Passengers = SUM ( Trips[Passenger Count] )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Average passengers per trip, over trips that report a passenger count.
+	measure 'Avg Passengers per Trip' =
+			DIVIDE (
+				[Passengers],
+				CALCULATE ( [Trips], KEEPFILTERS ( NOT ISBLANK ( Trips[Passenger Count] ) ) )
+			)
+		formatString: #,0.00
+		displayFolder: Volume
+
+	/// Average trips per calendar day that has trips in the current filter context.
+	measure 'Trips per Day' = DIVIDE ( [Trips], DISTINCTCOUNT ( Trips[Pickup Date] ) )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Total metered distance in miles.
+	measure 'Total Miles' = SUM ( Trips[Trip Miles] )
+		formatString: #,0
+		displayFolder: Distance and Time
+
+	/// Average metered distance per trip, in miles.
+	measure 'Avg Miles per Trip' = DIVIDE ( [Total Miles], [Trips] )
+		formatString: #,0.00
+		displayFolder: Distance and Time
+
+	/// Total time with the meter engaged, in hours.
+	measure 'Trip Hours' = DIVIDE ( SUM ( Trips[Trip Minutes] ), 60 )
+		formatString: #,0
+		displayFolder: Distance and Time
+
+	/// Average time with the meter engaged per trip, in minutes.
+	measure 'Avg Trip Minutes' = DIVIDE ( SUM ( Trips[Trip Minutes] ), [Trips] )
+		formatString: #,0.0
+		displayFolder: Distance and Time
+
+	/// Distance-weighted average speed in miles per hour, over plausible trips only (0.1 to 200 miles, 1 to 300 minutes) so meter errors do not distort it.
+	measure 'Avg Speed (mph)' =
+			CALCULATE (
+				DIVIDE ( SUM ( Trips[Trip Miles] ) * 60, SUM ( Trips[Trip Minutes] ) ),
+				KEEPFILTERS ( Trips[Trip Miles] >= 0.1 && Trips[Trip Miles] <= 200 ),
+				KEEPFILTERS ( Trips[Trip Minutes] >= 1 && Trips[Trip Minutes] <= 300 )
+			)
+		formatString: #,0.0
+		displayFolder: Distance and Time
+
+	/// Time-and-distance fare calculated by the meter, before extras, taxes, tolls and tips.
+	measure 'Fare Revenue' = SUM ( Trips[Fare Amount] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Revenue
+
+	/// Tips recorded on the trip. Only card tips are recorded; cash tips are not in the data.
+	measure Tips = SUM ( Trips[Tip Amount] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Revenue
+
+	/// Bridge and tunnel tolls paid on the trip.
+	measure Tolls = SUM ( Trips[Tolls Amount] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Revenue
+
+	/// Extras, MTA tax, improvement surcharge, NYS congestion surcharge, airport fee and the MTA congestion relief zone (CBD) fee.
+	measure 'Taxes and Surcharges' =
+			SUM ( Trips[Extra Amount] )
+				+ SUM ( Trips[MTA Tax] )
+				+ SUM ( Trips[Improvement Surcharge] )
+				+ SUM ( Trips[Congestion Surcharge] )
+				+ SUM ( Trips[Airport Fee] )
+				+ SUM ( Trips[CBD Congestion Fee] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Revenue
+
+	/// MTA congestion relief zone (CBD) fees, charged from 5 January 2025.
+	measure 'CBD Congestion Fees' = SUM ( Trips[CBD Congestion Fee] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Revenue
+
+	/// Total charged to passengers: fare, extras, taxes, surcharges, tolls and recorded tips. Excludes cash tips. Refunds and voids appear as negative amounts.
+	measure 'Total Revenue' = SUM ( Trips[Total Amount] )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Revenue
+
+	/// Average metered fare per trip.
+	measure 'Avg Fare per Trip' = DIVIDE ( [Fare Revenue], [Trips] )
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Revenue
+
+	/// Average total charged per trip.
+	measure 'Avg Revenue per Trip' = DIVIDE ( [Total Revenue], [Trips] )
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Revenue
+
+	/// Metered fare per metered mile.
+	measure 'Fare per Mile' = DIVIDE ( [Fare Revenue], [Total Miles] )
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Revenue
+
+	/// Trips paid by credit card, the only payment type with recorded tips.
+	measure 'Card Trips' = CALCULATE ( [Trips], KEEPFILTERS ( 'Payment Type'[Payment Type ID] = 1 ) )
+		formatString: #,0
+		displayFolder: Tipping
+
+	/// Share of trips paid by credit card.
+	measure 'Card Payment %' = DIVIDE ( [Card Trips], [Trips] )
+		formatString: 0.0%
+		displayFolder: Tipping
+
+	/// Tips on credit card trips.
+	measure 'Card Tips' = CALCULATE ( [Tips], KEEPFILTERS ( 'Payment Type'[Payment Type ID] = 1 ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Tipping
+
+	/// Card tips as a share of the metered fare on card trips: the usual way to read tipping, since cash tips are not recorded.
+	measure 'Card Tip Rate %' =
+			DIVIDE (
+				[Card Tips],
+				CALCULATE ( [Fare Revenue], KEEPFILTERS ( 'Payment Type'[Payment Type ID] = 1 ) )
+			)
+		formatString: 0.0%
+		displayFolder: Tipping
+
+	/// Average tip per credit card trip.
+	measure 'Avg Tip per Card Trip' = DIVIDE ( [Card Tips], [Card Trips] )
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Tipping
+
+	/// Trips picked up at JFK, LaGuardia or Newark airport (taxi zones 132, 138 and 1).
+	measure 'Airport Pickups' = CALCULATE ( [Trips], KEEPFILTERS ( 'Pickup Zone'[Pickup Location ID] IN { 1, 132, 138 } ) )
+		formatString: #,0
+		displayFolder: Mix
+
+	/// Share of trips picked up at an airport.
+	measure 'Airport Pickup %' = DIVIDE ( [Airport Pickups], [Trips] )
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Trips charged the Manhattan congestion relief zone (CBD) fee.
+	measure 'CBD Zone Trips' = CALCULATE ( [Trips], KEEPFILTERS ( Trips[CBD Congestion Fee] > 0 ) )
+		formatString: #,0
+		displayFolder: Mix
+
+	/// Share of trips charged the congestion relief zone (CBD) fee.
+	measure 'CBD Zone Trip %' = DIVIDE ( [CBD Zone Trips], [Trips] )
+		formatString: 0.0%
+		displayFolder: Mix
+
+	/// Latest pickup date loaded, ignoring all filters. Stops time intelligence from projecting past the data.
+	measure 'Last Trip Date' = CALCULATE ( MAX ( Trips[Pickup Date] ), REMOVEFILTERS () )
+		formatString: yyyy-mm-dd
+		isHidden
+		displayFolder: Helpers
+
+	/// Trips from 1 January of the selected year to the end of the selected period. Blank after the last loaded date.
+	measure 'Trips YTD' =
+			IF (
+				MIN ( 'Date'[Date] ) <= [Last Trip Date],
+				CALCULATE ( [Trips], DATESYTD ( 'Date'[Date] ) )
+			)
+		formatString: #,0
+		displayFolder: Time Intelligence\Trips
+
+	/// Trips in the same period one year earlier, limited to dates on or before the last loaded pickup date, so a period that runs past the loaded data compares like for like.
+	measure 'Trips PY' =
+			CALCULATE (
+				[Trips],
+				CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through Last Trip Date] = TRUE )
+			)
+		formatString: #,0
+		displayFolder: Time Intelligence\Trips
+
+	/// Year-to-date trips for the same period one year earlier.
+	measure 'Trips PY YTD' =
+			CALCULATE (
+				[Trips YTD],
+				CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through Last Trip Date] = TRUE )
+			)
+		formatString: #,0
+		displayFolder: Time Intelligence\Trips
+
+	/// Change in trips against the same period one year earlier. Blank when either year has no data.
+	measure 'Trips YoY' =
+			VAR CurrentValue = [Trips]
+			VAR PriorValue = [Trips PY]
+			RETURN
+				IF ( NOT ISBLANK ( CurrentValue ) && NOT ISBLANK ( PriorValue ), CurrentValue - PriorValue )
+		formatString: +#,0;-#,0;0
+		displayFolder: Time Intelligence\Trips
+
+	/// Percentage change in trips against the same period one year earlier.
+	measure 'Trips YoY %' = DIVIDE ( [Trips YoY], [Trips PY] )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time Intelligence\Trips
+
+	/// Percentage change in year-to-date trips against the same span one year earlier.
+	measure 'Trips YTD YoY %' = DIVIDE ( [Trips YTD] - [Trips PY YTD], [Trips PY YTD] )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time Intelligence\Trips
+
+	/// Total revenue from 1 January of the selected year to the end of the selected period. Blank after the last loaded date.
+	measure 'Total Revenue YTD' =
+			IF (
+				MIN ( 'Date'[Date] ) <= [Last Trip Date],
+				CALCULATE ( [Total Revenue], DATESYTD ( 'Date'[Date] ) )
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time Intelligence\Revenue
+
+	/// Total revenue in the same period one year earlier, limited to dates on or before the last loaded pickup date.
+	measure 'Total Revenue PY' =
+			CALCULATE (
+				[Total Revenue],
+				CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through Last Trip Date] = TRUE )
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time Intelligence\Revenue
+
+	/// Year-to-date total revenue for the same period one year earlier.
+	measure 'Total Revenue PY YTD' =
+			CALCULATE (
+				[Total Revenue YTD],
+				CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through Last Trip Date] = TRUE )
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time Intelligence\Revenue
+
+	/// Change in total revenue against the same period one year earlier. Blank when either year has no data.
+	measure 'Total Revenue YoY' =
+			VAR CurrentValue = [Total Revenue]
+			VAR PriorValue = [Total Revenue PY]
+			RETURN
+				IF ( NOT ISBLANK ( CurrentValue ) && NOT ISBLANK ( PriorValue ), CurrentValue - PriorValue )
+		formatString: +\$#,0;-\$#,0;\$0
+		displayFolder: Time Intelligence\Revenue
+
+	/// Percentage change in total revenue against the same period one year earlier.
+	measure 'Total Revenue YoY %' = DIVIDE ( [Total Revenue YoY], [Total Revenue PY] )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time Intelligence\Revenue
+
+	/// Percentage change in year-to-date total revenue against the same span one year earlier.
+	measure 'Total Revenue YTD YoY %' = DIVIDE ( [Total Revenue YTD] - [Total Revenue PY YTD], [Total Revenue PY YTD] )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time Intelligence\Revenue
+
+	/// Average fare per trip in the same period one year earlier.
+	measure 'Avg Fare per Trip PY' =
+			CALCULATE (
+				[Avg Fare per Trip],
+				CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through Last Trip Date] = TRUE )
+			)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Time Intelligence\Fares
+
+	/// Percentage change in the average fare per trip against the same period one year earlier.
+	measure 'Avg Fare per Trip YoY %' =
+			VAR PriorValue = [Avg Fare per Trip PY]
+			RETURN
+				IF ( NOT ISBLANK ( PriorValue ), DIVIDE ( [Avg Fare per Trip] - PriorValue, PriorValue ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time Intelligence\Fares
+
+	/// Pickup date (meter engaged). Foreign key to Date.
+	column 'Pickup Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Pickup Date
+
+	/// Pickup hour of day, 0 to 23. Foreign key to Time of Day.
+	column 'Pickup Hour'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Pickup Hour
+
+	/// TLC taxi zone where the meter was engaged. Foreign key to Pickup Zone.
+	column 'Pickup Location ID'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Pickup Location ID
+
+	/// TLC taxi zone where the meter was disengaged. Foreign key to Dropoff Zone.
+	column 'Dropoff Location ID'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Dropoff Location ID
+
+	/// TPEP provider that supplied the record. Foreign key to Vendor.
+	column 'Vendor ID'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Vendor ID
+
+	/// Final rate code in effect at the end of the trip; nulls are mapped to 99 (unknown). Foreign key to Rate Code.
+	column 'Rate Code ID'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Rate Code ID
+
+	/// How the passenger paid. Foreign key to Payment Type.
+	column 'Payment Type ID'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Payment Type ID
+
+	/// Passengers in the vehicle, as entered by the driver. Blank when not reported.
+	column 'Passenger Count'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Passenger Count
+
+	/// Elapsed trip distance in miles reported by the taximeter.
+	column 'Trip Miles'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: Trip Miles
+
+	/// Minutes between meter engaged and disengaged, rounded to two decimals.
+	column 'Trip Minutes'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: Trip Minutes
+
+	/// Time-and-distance fare calculated by the meter.
+	column 'Fare Amount'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Fare Amount
+
+	/// Miscellaneous extras and surcharges (rush hour and overnight charges).
+	column 'Extra Amount'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Extra Amount
+
+	/// MTA tax automatically triggered by the metered rate in use.
+	column 'MTA Tax'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: MTA Tax
+
+	/// Tip amount; populated automatically for credit card tips. Cash tips are not included.
+	column 'Tip Amount'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Tip Amount
+
+	/// Total tolls paid on the trip.
+	column 'Tolls Amount'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Tolls Amount
+
+	/// Improvement surcharge assessed at the flag drop.
+	column 'Improvement Surcharge'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Improvement Surcharge
+
+	/// Total amount charged to passengers. Does not include cash tips.
+	column 'Total Amount'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Total Amount
+
+	/// New York State congestion surcharge collected on the trip (0 when not reported).
+	column 'Congestion Surcharge'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Congestion Surcharge
+
+	/// Airport fee for pickups at LaGuardia and JFK (0 when not charged).
+	column 'Airport Fee'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: Airport Fee
+
+	/// MTA congestion relief zone fee, per trip, from 5 January 2025 (0 before that or when not charged).
+	column 'CBD Congestion Fee'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		summarizeBy: none
+		sourceColumn: CBD Congestion Fee
+
+	refreshPolicy
+		policyType: basic
+		rollingWindowGranularity: year
+		rollingWindowPeriods: 3
+		incrementalGranularity: month
+		incrementalPeriods: 3
+		sourceExpression =
+			let
+				// One Parquet file per month. RangeStart/RangeEnd pick the files and then the rows,
+				// so each incremental-refresh partition downloads only its own month(s).
+				FirstMonth = Date.StartOfMonth(Date.From(RangeStart)),
+				LastMonth = Date.StartOfMonth(Date.From(RangeEnd - #duration(0, 0, 0, 1))),
+				Months = List.Generate(() => FirstMonth, each _ <= LastMonth, each Date.AddMonths(_, 1)),
+				LoadMonth = (month as date) as table =>
+					let
+						FileName = "yellow_tripdata_" & Date.ToText(month, [Format = "yyyy-MM", Culture = "en-US"]) & ".parquet",
+						// A month the TLC has not published yet answers 403/404: treat it as empty so a rolling
+						// incremental-refresh window that reaches past the latest file still refreshes.
+						Response = Web.Contents(TlcBaseUrl & "trip-data/", [RelativePath = FileName, ManualStatusHandling = {403, 404}]),
+						Published = Value.Metadata(Response)[Response.Status] = 200,
+						Raw = if Published then Parquet.Document(Binary.Buffer(Response)) else #table({}, {}),
+						// Column casing differs between years (Airport_fee vs airport_fee); cbd_congestion_fee starts in 2025.
+						Lowered = Table.TransformColumnNames(Raw, Text.Lower),
+						Selected = Table.SelectColumns(
+							Lowered,
+							{"vendorid", "tpep_pickup_datetime", "tpep_dropoff_datetime", "passenger_count", "trip_distance",
+							 "ratecodeid", "pulocationid", "dolocationid", "payment_type", "fare_amount", "extra", "mta_tax",
+							 "tip_amount", "tolls_amount", "improvement_surcharge", "total_amount", "congestion_surcharge",
+							 "airport_fee", "cbd_congestion_fee"},
+							MissingField.UseNull
+						)
+					in
+						Selected,
+				Combined = Table.Combine(List.Transform(Months, LoadMonth)),
+				// Files contain a few stray trips outside their month; the range filter also defines partition boundaries.
+				InRange = Table.SelectRows(Combined, each [tpep_pickup_datetime] >= RangeStart and [tpep_pickup_datetime] < RangeEnd),
+				WithDate = Table.AddColumn(InRange, "Pickup Date", each Date.From([tpep_pickup_datetime]), type date),
+				WithHour = Table.AddColumn(WithDate, "Pickup Hour", each Time.Hour([tpep_pickup_datetime]), Int64.Type),
+				WithMinutes = Table.AddColumn(
+					WithHour,
+					"Trip Minutes",
+					each Number.Round(Duration.TotalMinutes([tpep_dropoff_datetime] - [tpep_pickup_datetime]), 2),
+					Currency.Type
+				),
+				// Null rate codes (trips from Flex Fare / app bookings) map to 99 = Null/unknown per the TLC data dictionary.
+				RateCodeFilled = Table.ReplaceValue(WithMinutes, null, 99, Replacer.ReplaceValue, {"ratecodeid"}),
+				ZeroFees = Table.ReplaceValue(RateCodeFilled, null, 0, Replacer.ReplaceValue, {"congestion_surcharge", "airport_fee", "cbd_congestion_fee"}),
+				Removed = Table.RemoveColumns(ZeroFees, {"tpep_pickup_datetime", "tpep_dropoff_datetime"}),
+				Renamed = Table.RenameColumns(
+					Removed,
+					{{"vendorid", "Vendor ID"}, {"passenger_count", "Passenger Count"}, {"trip_distance", "Trip Miles"},
+					 {"ratecodeid", "Rate Code ID"}, {"pulocationid", "Pickup Location ID"}, {"dolocationid", "Dropoff Location ID"},
+					 {"payment_type", "Payment Type ID"}, {"fare_amount", "Fare Amount"}, {"extra", "Extra Amount"},
+					 {"mta_tax", "MTA Tax"}, {"tip_amount", "Tip Amount"}, {"tolls_amount", "Tolls Amount"},
+					 {"improvement_surcharge", "Improvement Surcharge"}, {"total_amount", "Total Amount"},
+					 {"congestion_surcharge", "Congestion Surcharge"}, {"airport_fee", "Airport Fee"},
+					 {"cbd_congestion_fee", "CBD Congestion Fee"}}
+				),
+				Typed = Table.TransformColumnTypes(
+					Renamed,
+					{{"Vendor ID", Int64.Type}, {"Passenger Count", Int64.Type}, {"Trip Miles", Currency.Type},
+					 {"Rate Code ID", Int64.Type}, {"Pickup Location ID", Int64.Type}, {"Dropoff Location ID", Int64.Type},
+					 {"Payment Type ID", Int64.Type}, {"Fare Amount", Currency.Type}, {"Extra Amount", Currency.Type},
+					 {"MTA Tax", Currency.Type}, {"Tip Amount", Currency.Type}, {"Tolls Amount", Currency.Type},
+					 {"Improvement Surcharge", Currency.Type}, {"Total Amount", Currency.Type},
+					 {"Congestion Surcharge", Currency.Type}, {"Airport Fee", Currency.Type}, {"CBD Congestion Fee", Currency.Type}}
+				)
+			in
+				Typed
+
+	partition Trips = m
+		mode: import
+		source =
+			let
+				// One Parquet file per month. RangeStart/RangeEnd pick the files and then the rows,
+				// so each incremental-refresh partition downloads only its own month(s).
+				FirstMonth = Date.StartOfMonth(Date.From(RangeStart)),
+				LastMonth = Date.StartOfMonth(Date.From(RangeEnd - #duration(0, 0, 0, 1))),
+				Months = List.Generate(() => FirstMonth, each _ <= LastMonth, each Date.AddMonths(_, 1)),
+				LoadMonth = (month as date) as table =>
+					let
+						FileName = "yellow_tripdata_" & Date.ToText(month, [Format = "yyyy-MM", Culture = "en-US"]) & ".parquet",
+						// A month the TLC has not published yet answers 403/404: treat it as empty so a rolling
+						// incremental-refresh window that reaches past the latest file still refreshes.
+						Response = Web.Contents(TlcBaseUrl & "trip-data/", [RelativePath = FileName, ManualStatusHandling = {403, 404}]),
+						Published = Value.Metadata(Response)[Response.Status] = 200,
+						Raw = if Published then Parquet.Document(Binary.Buffer(Response)) else #table({}, {}),
+						// Column casing differs between years (Airport_fee vs airport_fee); cbd_congestion_fee starts in 2025.
+						Lowered = Table.TransformColumnNames(Raw, Text.Lower),
+						Selected = Table.SelectColumns(
+							Lowered,
+							{"vendorid", "tpep_pickup_datetime", "tpep_dropoff_datetime", "passenger_count", "trip_distance",
+							 "ratecodeid", "pulocationid", "dolocationid", "payment_type", "fare_amount", "extra", "mta_tax",
+							 "tip_amount", "tolls_amount", "improvement_surcharge", "total_amount", "congestion_surcharge",
+							 "airport_fee", "cbd_congestion_fee"},
+							MissingField.UseNull
+						)
+					in
+						Selected,
+				Combined = Table.Combine(List.Transform(Months, LoadMonth)),
+				// Files contain a few stray trips outside their month; the range filter also defines partition boundaries.
+				InRange = Table.SelectRows(Combined, each [tpep_pickup_datetime] >= RangeStart and [tpep_pickup_datetime] < RangeEnd),
+				WithDate = Table.AddColumn(InRange, "Pickup Date", each Date.From([tpep_pickup_datetime]), type date),
+				WithHour = Table.AddColumn(WithDate, "Pickup Hour", each Time.Hour([tpep_pickup_datetime]), Int64.Type),
+				WithMinutes = Table.AddColumn(
+					WithHour,
+					"Trip Minutes",
+					each Number.Round(Duration.TotalMinutes([tpep_dropoff_datetime] - [tpep_pickup_datetime]), 2),
+					Currency.Type
+				),
+				// Null rate codes (trips from Flex Fare / app bookings) map to 99 = Null/unknown per the TLC data dictionary.
+				RateCodeFilled = Table.ReplaceValue(WithMinutes, null, 99, Replacer.ReplaceValue, {"ratecodeid"}),
+				ZeroFees = Table.ReplaceValue(RateCodeFilled, null, 0, Replacer.ReplaceValue, {"congestion_surcharge", "airport_fee", "cbd_congestion_fee"}),
+				Removed = Table.RemoveColumns(ZeroFees, {"tpep_pickup_datetime", "tpep_dropoff_datetime"}),
+				Renamed = Table.RenameColumns(
+					Removed,
+					{{"vendorid", "Vendor ID"}, {"passenger_count", "Passenger Count"}, {"trip_distance", "Trip Miles"},
+					 {"ratecodeid", "Rate Code ID"}, {"pulocationid", "Pickup Location ID"}, {"dolocationid", "Dropoff Location ID"},
+					 {"payment_type", "Payment Type ID"}, {"fare_amount", "Fare Amount"}, {"extra", "Extra Amount"},
+					 {"mta_tax", "MTA Tax"}, {"tip_amount", "Tip Amount"}, {"tolls_amount", "Tolls Amount"},
+					 {"improvement_surcharge", "Improvement Surcharge"}, {"total_amount", "Total Amount"},
+					 {"congestion_surcharge", "Congestion Surcharge"}, {"airport_fee", "Airport Fee"},
+					 {"cbd_congestion_fee", "CBD Congestion Fee"}}
+				),
+				Typed = Table.TransformColumnTypes(
+					Renamed,
+					{{"Vendor ID", Int64.Type}, {"Passenger Count", Int64.Type}, {"Trip Miles", Currency.Type},
+					 {"Rate Code ID", Int64.Type}, {"Pickup Location ID", Int64.Type}, {"Dropoff Location ID", Int64.Type},
+					 {"Payment Type ID", Int64.Type}, {"Fare Amount", Currency.Type}, {"Extra Amount", Currency.Type},
+					 {"MTA Tax", Currency.Type}, {"Tip Amount", Currency.Type}, {"Tolls Amount", Currency.Type},
+					 {"Improvement Surcharge", Currency.Type}, {"Total Amount", Currency.Type},
+					 {"Congestion Surcharge", Currency.Type}, {"Airport Fee", Currency.Type}, {"CBD Congestion Fee", Currency.Type}}
+				)
+			in
+				Typed

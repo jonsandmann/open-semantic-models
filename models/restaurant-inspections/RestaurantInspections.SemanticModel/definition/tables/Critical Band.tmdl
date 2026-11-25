@@ -1,0 +1,21 @@
+/// Critical violations cited at an inspection, banded: none, 1, 2, 3 or more. The band holds the findings constant, so outcomes can be compared across jurisdictions at the same level of findings (the red team's correction).
+table 'Critical Band'
+
+	/// 0, 1, 2 or 3 (3 means three or more). Primary key, related to 'Fact Inspection'[Critical Band Key].
+	column 'Critical Band Key'
+		dataType: int64
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Critical Band Key
+
+	/// No critical, 1 critical, 2 critical, 3+ critical. Sorted by Critical Band Key.
+	column 'Critical Band'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Critical Band
+		sortByColumn: 'Critical Band Key'
+
+	partition 'Critical Band' = m
+		mode: import
+		source = #table(type table [Critical Band Key = Int64.Type, Critical Band = text], {{0, "No critical"}, {1, "1 critical"}, {2, "2 critical"}, {3, "3+ critical"}})

@@ -1,0 +1,310 @@
+/// Fact table: NOAA Storm Events details, one row per event id (the county or zone segment of a storm), from the latest vintage of each data year loaded. Damage and the event's death and injury counts live here; sum event rows, never the locations file and never an episode total on top. Every column is hidden; analysis goes through the measures and the dimensions. Source: NOAA NCEI Storm Events Database, public domain.
+table 'Fact Event'
+
+	/// Storm events (event ids) in the filter context. One row per event: a county or zone segment of a storm, not the storm system.
+	measure Events = COUNTROWS ( 'Fact Event' )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Storm systems (distinct episode ids) in the filter context. An episode spans several events; this is not a sum of events.
+	measure Episodes = DISTINCTCOUNT ( 'Fact Event'[Episode ID] )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// States, territories and marine areas with at least one event in the filter context.
+	measure 'States in scope' = DISTINCTCOUNT ( 'Fact Event'[State] )
+		formatString: 0
+		displayFolder: Volume
+
+	/// Reported property damage in US dollars. A blank damage cell is left out (unknown, not zero).
+	measure 'Property damage' = SUM ( 'Fact Event'[Property Damage USD] )
+		formatString: \$#,0
+		displayFolder: Loss
+
+	/// Reported crop damage in US dollars. A blank damage cell is left out (unknown, not zero).
+	measure 'Crop damage' = SUM ( 'Fact Event'[Crop Damage USD] )
+		formatString: \$#,0
+		displayFolder: Loss
+
+	/// Property plus crop damage, row by row, with a blank cell counted as nothing. Events with both cells blank add nothing.
+	measure 'Total damage' = SUMX ( 'Fact Event', COALESCE ( 'Fact Event'[Property Damage USD], 0 ) + COALESCE ( 'Fact Event'[Crop Damage USD], 0 ) )
+		formatString: \$#,0
+		displayFolder: Loss
+
+	/// Events with a property damage figure above zero.
+	measure 'Events with property damage' = CALCULATE ( [Events], KEEPFILTERS ( 'Fact Event'[Property Damage USD] > 0 ) )
+		formatString: #,0
+		displayFolder: Loss
+
+	/// Total damage divided by every event in the filter context, including events with no damage figure. A reported loss per event, not the mean of the damage column.
+	measure 'Damage per event' = DIVIDE ( [Total damage], [Events] )
+		formatString: \$#,0
+		displayFolder: Loss
+
+	/// Direct plus indirect deaths recorded on the event rows. Does not read the fatalities file; never add it to Fatality records.
+	measure Deaths = SUMX ( 'Fact Event', COALESCE ( 'Fact Event'[Deaths Direct], 0 ) + COALESCE ( 'Fact Event'[Deaths Indirect], 0 ) )
+		formatString: #,0
+		displayFolder: Deaths
+
+	/// Direct deaths recorded on the event rows (caused by the weather itself).
+	measure 'Direct deaths' = SUM ( 'Fact Event'[Deaths Direct] )
+		formatString: #,0
+		displayFolder: Deaths
+
+	/// Indirect deaths recorded on the event rows (related to the event, for example a road crash).
+	measure 'Indirect deaths' = SUM ( 'Fact Event'[Deaths Indirect] )
+		formatString: #,0
+		displayFolder: Deaths
+
+	/// Direct plus indirect injuries recorded on the event rows.
+	measure Injuries = SUMX ( 'Fact Event', COALESCE ( 'Fact Event'[Injuries Direct], 0 ) + COALESCE ( 'Fact Event'[Injuries Indirect], 0 ) )
+		formatString: #,0
+		displayFolder: Deaths
+
+	/// Events with at least one direct or indirect death on the row.
+	measure 'Events with a death' = COUNTROWS ( FILTER ( 'Fact Event', COALESCE ( 'Fact Event'[Deaths Direct], 0 ) + COALESCE ( 'Fact Event'[Deaths Indirect], 0 ) > 0 ) )
+		formatString: #,0
+		displayFolder: Deaths
+
+	/// Tornado events in the filter context. Keeps any event type filter, so a Hail row shows blank and a Tornado row its count.
+	measure Tornadoes = CALCULATE ( [Events], KEEPFILTERS ( 'Event Type'[Event Type] = "Tornado" ) )
+		formatString: #,0
+		displayFolder: Tornado
+
+	/// Tornadoes rated EF2 or stronger (or F2 and up in older years). EFU, an unrated tornado, is not counted.
+	measure 'EF2 or stronger' = CALCULATE ( [Tornadoes], KEEPFILTERS ( 'Tornado Scale'[Scale Number] >= 2 ) )
+		formatString: #,0
+		displayFolder: Tornado
+
+	/// Sum of tornado path lengths in miles. Each row is a county segment, so a track that crosses counties is several segments; this is total path on the ground, not one track.
+	measure 'Tornado path miles' = CALCULATE ( SUM ( 'Fact Event'[Tornado Length Miles] ), KEEPFILTERS ( 'Event Type'[Event Type] = "Tornado" ) )
+		formatString: #,0.0
+		displayFolder: Tornado
+
+	/// Mean of the magnitude column. Blank unless the events in context are all one event type, because the unit depends on the type (hail in inches, wind in knots).
+	measure 'Average magnitude' =
+			IF (
+				CALCULATE ( DISTINCTCOUNT ( 'Fact Event'[Event Type] ) ) = 1,
+				AVERAGE ( 'Fact Event'[Magnitude] )
+			)
+		formatString: 0.00
+		displayFolder: Magnitude
+
+	/// Events year to date by begin date: January through the selected period of the same year. Blank for a period that starts after the last loaded begin date.
+	measure 'Events YTD' = IF ( MIN ( 'Date'[Date] ) <= [Last Begin Date], TOTALYTD ( [Events], 'Date'[Date] ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Property damage year to date by begin date. Blank for a period that starts after the last loaded begin date.
+	measure 'Property damage YTD' = IF ( MIN ( 'Date'[Date] ) <= [Last Begin Date], TOTALYTD ( [Property damage], 'Date'[Date] ) )
+		formatString: \$#,0
+		displayFolder: Time
+
+	/// Events in the same period one year earlier, by begin date, over the same days that have data now (a year in progress compares like with like). Shifts Date only, never End Date or Fatality Date.
+	measure 'Events prior year' =
+			VAR LastDay = [Last Begin Date]
+			RETURN
+				CALCULATE ( [Events], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Change in events against the same period a year earlier, as a percentage of the prior year.
+	measure 'Events YoY %' = IF ( NOT ISBLANK ( [Events] ), DIVIDE ( [Events] - [Events prior year], [Events prior year] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Property damage in the same period one year earlier, by begin date, over the same days that have data now.
+	measure 'Property damage prior year' =
+			VAR LastDay = [Last Begin Date]
+			RETURN
+				CALCULATE ( [Property damage], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: \$#,0
+		displayFolder: Time
+
+	/// Change in property damage against the same period a year earlier, as a percentage of the prior year. One large event can swing it (a single 2025 Missouri tornado is 1.6 billion dollars).
+	measure 'Property damage YoY %' = IF ( NOT ISBLANK ( [Property damage] ), DIVIDE ( [Property damage] - [Property damage prior year], [Property damage prior year] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Latest event begin date in the model, ignoring every filter. The year-to-date and prior-year measures read it.
+	measure 'Last Begin Date' = CALCULATE ( MAX ( 'Fact Event'[Begin Date] ), REMOVEFILTERS () )
+		formatString: yyyy-mm-dd
+		isHidden
+		displayFolder: Audit
+
+	/// Event rows whose property damage cell is blank (unknown, kept out of the sums, not counted as zero).
+	measure 'Blank property cells' = CALCULATE ( [Events], KEEPFILTERS ( ISBLANK ( 'Fact Event'[Property Damage USD] ) ) )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Creation date of the newest file loaded (the c date in the file name). NOAA replaces a year's file when it revises it; one vintage per data year is loaded.
+	measure 'File vintage' = CALCULATE ( MAX ( 'Fact Event'[File Built] ), REMOVEFILTERS () )
+		formatString: yyyy-mm-dd
+		displayFolder: Audit
+
+	/// The source line to show on any report built from this model, with the vintage loaded.
+	measure Citation = "Source: NOAA National Centers for Environmental Information, Storm Events Database, bulk CSV vintage c" & FORMAT ( [File vintage], "yyyymmdd" ) & ". Public domain."
+		formatString: @
+		displayFolder: About
+
+	/// NOAA's event id. Primary key; related from 'Fact Fatality'[Event ID].
+	column 'Event ID'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Event ID
+
+	/// NOAA's episode id: the storm system the event belongs to. Not a key; read through Episodes.
+	column 'Episode ID'
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Episode ID
+
+	/// Day the event began (local standard time of the county or zone). Foreign key to 'Date'[Date].
+	column 'Begin Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Begin Date
+
+	/// Day the event ended. Foreign key to 'End Date'[Date].
+	column 'End Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: End Date
+
+	/// State, territory or marine area name. Foreign key to State[State].
+	column State
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: State
+
+	/// Event type. Foreign key to 'Event Type'[Event Type].
+	column 'Event Type'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Event Type
+
+	/// C county, Z zone, M marine zone. Foreign key to 'Area Type'[CZ Type].
+	column 'CZ Type'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: CZ Type
+
+	/// County or zone name as published. Not a key on its own (names repeat across states).
+	column 'CZ Name'
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: CZ Name
+
+	/// Property damage in US dollars, parsed from DAMAGE_PROPERTY (K thousands, M millions, B billions). Blank when NOAA left it blank, never zero-filled.
+	column 'Property Damage USD'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0
+		summarizeBy: none
+		sourceColumn: Property Damage USD
+
+	/// Crop damage in US dollars, parsed from DAMAGE_CROPS. Blank when NOAA left it blank.
+	column 'Crop Damage USD'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: \$#,0
+		summarizeBy: none
+		sourceColumn: Crop Damage USD
+
+	/// Direct deaths on the event row.
+	column 'Deaths Direct'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Deaths Direct
+
+	/// Indirect deaths on the event row.
+	column 'Deaths Indirect'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Deaths Indirect
+
+	/// Direct injuries on the event row.
+	column 'Injuries Direct'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Injuries Direct
+
+	/// Indirect injuries on the event row.
+	column 'Injuries Indirect'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Injuries Indirect
+
+	/// Tornado rating (EF0 to EF5, EFU), None for every other event. Foreign key to 'Tornado Scale'[Tornado Scale].
+	column 'Tornado Scale'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Tornado Scale
+
+	/// Tornado segment path length in miles. Blank except tornadoes.
+	column 'Tornado Length Miles'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: Tornado Length Miles
+
+	/// Tornado path width in yards. Blank except tornadoes.
+	column 'Tornado Width Yards'
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Tornado Width Yards
+
+	/// Magnitude; its unit depends on the event type (hail size in inches, wind speed in knots). Not additive; read through Average magnitude for one type.
+	column Magnitude
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0.00
+		summarizeBy: none
+		sourceColumn: Magnitude
+
+	/// Creation date of the file the row came from (the c date in the file name).
+	column 'File Built'
+		dataType: dateTime
+		isHidden
+		isAvailableInMdx: false
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: File Built
+
+	partition 'Fact Event' = m
+		mode: import
+		source = Table.SelectColumns(StormDetails, {"Event ID", "Episode ID", "Begin Date", "End Date", "State", "Event Type", "CZ Type", "CZ Name", "Property Damage USD", "Crop Damage USD", "Deaths Direct", "Deaths Indirect", "Injuries Direct", "Injuries Indirect", "Tornado Scale", "Tornado Length Miles", "Tornado Width Yards", "Magnitude", "File Built"})

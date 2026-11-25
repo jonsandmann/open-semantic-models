@@ -1,0 +1,26 @@
+/// Whether the property was newly built at the time of the sale (Land Registry's old/new flag). Most new-build sales are registered months after they complete, so a recent month in one update file holds few of them.
+table Build
+
+	/// New build (flag Y) or Established (flag N). Primary key, related to 'Fact Sale'[Build].
+	column Build
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Build
+		sortByColumn: 'Build Sort'
+
+	/// Sort order for Build: 1 New build, 2 Established.
+	column 'Build Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Build Sort
+
+	partition Build = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [Build = text, Build Sort = Int64.Type], {{"New build", 1}, {"Established", 2}})
+			in
+				Source

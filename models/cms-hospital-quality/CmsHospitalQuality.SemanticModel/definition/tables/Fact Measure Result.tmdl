@@ -1,0 +1,224 @@
+/// Fact table: CMS Complications and Deaths - Hospital (dataset ynj2-r877). Grain: one row per facility x measure x performance window x catalog release; the November 2026 release has 95,740 rows (4,787 facilities x 20 measures). Start Date and End Date are the performance window CMS measured, not the day the file was posted; Release Date is the catalog release. "Not Available" scores and estimates load as blank, never zero. Every column is hidden; analysis goes through the measures and the Hospital, Quality Measure, Performance Date and Release Date dimensions.
+table 'Fact Measure Result'
+
+	/// Latest catalog release in the filter context among measure results. Every result measure reads only this release, so a hospital is never counted twice when a second release with overlapping performance windows is loaded (the same rule the star measures follow).
+	measure 'Latest result release' = MAX ( 'Fact Measure Result'[Release Date] )
+		formatString: yyyy-mm-dd
+		displayFolder: Audit
+
+	/// Measure result rows in the latest catalog release in context: one per hospital and measure, whether or not CMS published a score. Rows, not hospitals.
+	measure Results =
+			VAR Release = [Latest result release]
+			RETURN
+				CALCULATE ( COUNTROWS ( 'Fact Measure Result' ), 'Fact Measure Result'[Release Date] = Release )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Distinct hospitals with at least one measure result row (scored or not) in the latest catalog release in context. Unlike Hospitals, this follows Performance Date, Release Date and Quality Measure filters.
+	measure 'Hospitals with a result' =
+			VAR Release = [Latest result release]
+			RETURN
+				CALCULATE ( DISTINCTCOUNT ( 'Fact Measure Result'[Facility ID] ), 'Fact Measure Result'[Release Date] = Release )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Measure result rows that carry a published (numeric) score, latest release in context. CMS's "Not Available" is blank and not counted.
+	measure 'Reported scores' = CALCULATE ( [Results], KEEPFILTERS ( NOT ISBLANK ( 'Fact Measure Result'[Score] ) ) )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Measure result rows counted by the start of their performance window instead of its end, latest release in context (uses the inactive Start Date relationship to 'Performance Date').
+	measure 'Results by window start' = CALCULATE ( [Results], USERELATIONSHIP ( 'Fact Measure Result'[Start Date], 'Performance Date'[Date] ) )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Measure result rows by catalog release, ignoring any 'Performance Date' filter: put 'Release Date' on the axis to see each release's rows, whatever windows they cover.
+	measure 'Results by release' = CALCULATE ( [Results], REMOVEFILTERS ( 'Performance Date' ) )
+		formatString: #,0
+		displayFolder: Volume
+
+	/// Unweighted mean of published scores in the latest catalog release in context, each hospital counting once. Blank unless exactly one quality measure is in scope, because CMS measures are on different scales (a death rate near 12 against PSI 90 near 1). "Not Available" scores are ignored, not counted as zero.
+	measure 'Average score' =
+			IF (
+				HASONEVALUE ( 'Quality Measure'[Measure ID] ),
+				VAR Release = [Latest result release]
+				RETURN
+					CALCULATE ( AVERAGE ( 'Fact Measure Result'[Score] ), 'Fact Measure Result'[Release Date] = Release )
+			)
+		formatString: 0.00
+		displayFolder: Result
+
+	/// Mean score weighted by each hospital's denominator (eligible cases), over rows that have both a score and a denominator, latest catalog release in context. Blank unless exactly one quality measure is in scope. PSI 90 has no denominator (CMS: Not Applicable), so it is blank there.
+	measure 'Denominator weighted score' =
+			IF (
+				HASONEVALUE ( 'Quality Measure'[Measure ID] ),
+				VAR Release = [Latest result release]
+				VAR ScoredRows =
+					FILTER (
+						'Fact Measure Result',
+						'Fact Measure Result'[Release Date] = Release
+							&& NOT ISBLANK ( 'Fact Measure Result'[Score] )
+							&& NOT ISBLANK ( 'Fact Measure Result'[Denominator] )
+					)
+				RETURN
+					DIVIDE (
+						SUMX ( ScoredRows, 'Fact Measure Result'[Score] * 'Fact Measure Result'[Denominator] ),
+						SUMX ( ScoredRows, 'Fact Measure Result'[Denominator] )
+					)
+			)
+		formatString: 0.00
+		displayFolder: Result
+
+	/// Sum of denominators (eligible cases) in the latest catalog release in context. Blank where CMS published Not Available or Not Applicable.
+	measure 'Total denominator' =
+			VAR Release = [Latest result release]
+			RETURN
+				CALCULATE ( SUM ( 'Fact Measure Result'[Denominator] ), 'Fact Measure Result'[Release Date] = Release )
+		formatString: #,0
+		displayFolder: Result
+
+	/// Results CMS rates better than the national rate or value (both wordings in the file).
+	measure 'Better than national' = CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] IN { "Better Than the National Rate", "Better Than the National Value" } ) )
+		formatString: #,0
+		displayFolder: Comparison
+
+	/// Results CMS rates worse than the national rate or value (both wordings in the file).
+	measure 'Worse than national' = CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] IN { "Worse Than the National Rate", "Worse Than the National Value" } ) )
+		formatString: #,0
+		displayFolder: Comparison
+
+	/// Results CMS rates no different from the national rate or value (both wordings in the file).
+	measure 'No different than national' = CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] IN { "No Different Than the National Rate", "No Different Than the National Value" } ) )
+		formatString: #,0
+		displayFolder: Comparison
+
+	/// Results CMS did not compare because the hospital had too few cases ("Number of Cases Too Small").
+	measure 'Too small to compare' = CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] = "Number of Cases Too Small" ) )
+		formatString: #,0
+		displayFolder: Comparison
+
+	/// Results with no comparison ("Not Available"). Every MORT_30_* death-rate row is Not Available here even when a score is published, so this is not "same as national" and not "worse".
+	measure 'Not available to compare' = CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] = "Not Available" ) )
+		formatString: #,0
+		displayFolder: Comparison
+
+	/// Share of compared results that CMS rates worse than national: worse / (better + no different + worse). Not Available and too-small results are left out of both sides.
+	measure 'Share worse' = DIVIDE ( [Worse than national], [Better than national] + [No different than national] + [Worse than national] )
+		formatString: 0.0%
+		displayFolder: Comparison
+
+	/// Share of compared results that CMS rates better than national: better / (better + no different + worse).
+	measure 'Share better' = DIVIDE ( [Better than national], [Better than national] + [No different than national] + [Worse than national] )
+		formatString: 0.0%
+		displayFolder: Comparison
+
+	/// CMS Certification Number of the hospital. Foreign key to Hospital[Facility ID].
+	column 'Facility ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Facility ID
+
+	/// CMS measure identifier. Foreign key to 'Quality Measure'[Measure ID].
+	column 'Measure ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Measure ID
+
+	/// First day of the performance window CMS measured (for example 2022-07-01). Inactive relationship to 'Performance Date'[Date]; used by Results by window start.
+	column 'Start Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Start Date
+
+	/// Last day of the performance window CMS measured (for example 2025-06-30). Active relationship to 'Performance Date'[Date].
+	column 'End Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: End Date
+
+	/// Catalog release the row was published in, read from the dataset's metastore entry at refresh (2026-11-12 for this release). Active relationship to 'Release Date'[Date]; the result measures read only the latest release in context.
+	column 'Release Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Release Date
+
+	/// Hospital's risk-standardized result for the measure (a rate; PSI 90 is a ratio near 1). Lower is better. Blank where CMS published "Not Available". Read through Average score or Denominator weighted score.
+	column Score
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0.00
+		summarizeBy: none
+		sourceColumn: Score
+
+	/// Eligible cases behind the score. Blank where CMS published "Not Available", or "Not Applicable" (PSI 90).
+	column Denominator
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Denominator
+
+	/// Lower bound of CMS's interval estimate for the score. Blank where not published.
+	column 'Lower Estimate'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0.00
+		summarizeBy: none
+		sourceColumn: Lower Estimate
+
+	/// Upper bound of CMS's interval estimate for the score. Blank where not published.
+	column 'Higher Estimate'
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		formatString: 0.00
+		summarizeBy: none
+		sourceColumn: Higher Estimate
+
+	/// CMS's comparison with the national figure: Better/No Different/Worse Than the National Rate (or Value, for PSI 90), Number of Cases Too Small, or Not Available. Read through the Comparison measures; never treat Not Available as no different.
+	column 'Compared to National'
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Compared to National
+
+	/// CMS footnote code(s) for the row, for example 1 or 5 (see the CMS hospital data dictionary); blank when none.
+	column Footnote
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: Footnote
+
+	partition 'Fact Measure Result' = m
+		mode: import
+		source =
+			let
+				Source = ComplicationsAndDeaths,
+				Keep = Table.SelectColumns(Source, {"Facility ID", "Measure ID", "Start Date", "End Date", "Release Date", "Score", "Denominator", "Lower Estimate", "Higher Estimate", "Compared to National", "Footnote"}),
+				// CMS writes "Not Available" / "Not Applicable" in numeric fields: those become null, never zero.
+				ToNumber = (t) => try Number.FromText(t, "en-US") otherwise null,
+				ToDate = (t) => Date.FromText(t, [Format = "MM/dd/yyyy", Culture = "en-US"]),
+				Converted = Table.TransformColumns(Keep, {
+					{"Score", ToNumber}, {"Denominator", ToNumber}, {"Lower Estimate", ToNumber}, {"Higher Estimate", ToNumber},
+					{"Start Date", ToDate}, {"End Date", ToDate}
+				}),
+				Typed = Table.TransformColumnTypes(Converted, {
+					{"Facility ID", type text}, {"Measure ID", type text}, {"Start Date", type date}, {"End Date", type date},
+					{"Score", Currency.Type}, {"Denominator", Int64.Type}, {"Lower Estimate", Currency.Type}, {"Higher Estimate", Currency.Type},
+					{"Compared to National", type text}, {"Footnote", type text}
+				})
+			in
+				Typed

@@ -1,0 +1,20 @@
+/// FIRMS's inferred hotspot type. Every type is loaded and counted by default; Vegetation detections and Vegetation FRP keep type 0 only. Static land sources (gas flares, industrial heat) stay in the data so the counts agree with FIRMS.
+table 'Hotspot Type'
+
+	/// FIRMS type code 0 to 3. Primary key, related to 'Fact Detection'[Type Code].
+	column 'Type Code'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Type Code
+
+	/// Presumed vegetation fire (0), Active volcano (1), Other static land source (2), Offshore (3).
+	column 'Hotspot Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Hotspot Type
+		sortByColumn: 'Type Code'
+
+	partition 'Hotspot Type' = m
+		mode: import
+		source = #table(type table [Type Code = text, Hotspot Type = text], {{"0", "Presumed vegetation fire"}, {"1", "Active volcano"}, {"2", "Other static land source"}, {"3", "Offshore"}})

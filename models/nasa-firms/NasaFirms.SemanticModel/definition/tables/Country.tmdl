@@ -1,0 +1,13 @@
+/// Country of the FIRMS country file the detection came from (the file is already clipped to the country). One row per country loaded.
+table Country
+
+	/// Country name, for example Portugal. Primary key, related to 'Fact Detection'[Country].
+	column Country
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Country
+
+	partition Country = m
+		mode: import
+		source = Table.Distinct(Table.SelectColumns(FirmsDetections, {"Country"}))

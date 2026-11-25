@@ -1,0 +1,73 @@
+/// Root of census.gov. The workbook is read with Web.Contents on this root and RelativePath "retail/mrts/www/mrtssales92-present.xlsx", so the service sees one static, anonymous Web data source whose root answers 200 (its credential test calls the root; /retail/mrts/www/ answers 404).
+expression CensusBaseUrl = "https://www.census.gov/" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// First day of the Date table: 1 January 1992, the first month in the Monthly Retail Trade Survey workbook.
+expression CalendarStart = #date(1992, 1, 1) meta [IsParameterQuery = true, Type = "Date", IsParameterQueryRequired = true]
+
+/// Last day of the Date table: 31 December of the current year at refresh time, so the calendar holds whole years and grows with the workbook.
+expression CalendarEnd = Date.EndOfYear(Date.From(DateTime.FixedLocalNow()))
+
+/// Shared query, not loaded: every published cell of the Census Monthly Retail Trade workbook (mrtssales92-present.xlsx) as one row per kind of business x month x adjustment, read from the one sheet per year. Month columns are picked by their header text, so the CY CUM, PY CUM and annual TOTAL columns and the footnote rows are never loaded. (S) suppressed and (NA) not-available cells are kept with a blank Sales USD and their Cell Status. Feeds the Fact Retail Sales and Kind tables.
+expression MrtsCells =
+		let
+			Source = Excel.Workbook(Web.Contents(CensusBaseUrl, [RelativePath = "retail/mrts/www/mrtssales92-present.xlsx"]), null, true),
+			// One sheet per year, named by the year (2026 back to 1992). Sheet Order 0 is the newest year.
+			Sheets = Table.SelectRows(Source, each [Kind] = "Sheet" and (try Number.FromText([Name]) otherwise null) <> null),
+			SheetsIndexed = Table.AddIndexColumn(Sheets, "Sheet Order", 0, 1, Int64.Type),
+			MonthNames = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
+			CellText = (v as any) as text => if v = null then "" else Text.Trim(Text.From(v, "en-US")),
+			ParseSheet = (Data as table, SheetOrder as number) as table =>
+				let
+					Cols = Table.ColumnNames(Data),
+					// Row 5 holds the month headers: "Jan. 2026" ... "Sep. 2026(p)", then CY CUM / PY CUM or TOTAL.
+					Header = List.Transform(Record.ToList(Data{4}), CellText),
+					MonthPositions = List.Select(List.Positions(Header), each List.Contains(MonthNames, Text.Start(Header{_}, 3))),
+					Body = Table.Skip(Data, 5),
+					Indexed = Table.AddIndexColumn(Body, "Row Order", 0, 1, Int64.Type),
+					// Section rows "NOT ADJUSTED" and "ADJUSTED(2)" set the adjustment for the rows under them.
+					Marked = Table.AddColumn(Indexed, "Section", each
+						let n = Text.Upper(CellText(Record.Field(_, Cols{1})))
+						in if Text.StartsWith(n, "NOT ADJUSTED") then "Not seasonally adjusted"
+							else if Text.StartsWith(n, "ADJUSTED") then "Seasonally adjusted"
+							else null),
+					WithAdjustment = Table.AddColumn(Marked, "Adjustment", each [Section]),
+					Filled = Table.FillDown(WithAdjustment, {"Adjustment"}),
+					// Kind lines: under a section, not the section row itself, with a name in column 2 (footnotes have text in column 1 only).
+					DataRows = Table.SelectRows(Filled, each [Section] = null and [Adjustment] <> null and CellText(Record.Field(_, Cols{1})) <> ""),
+					OneMonth = (p as number) as table =>
+						let
+							Label = Header{p},
+							Clean = Text.Trim(Text.Replace(Text.Replace(Label, "(p)", ""), "(r)", "")),
+							Parts = Text.Split(Clean, " "),
+							MonthDate = #date(Number.FromText(List.Last(Parts)), List.PositionOf(MonthNames, Text.Start(Parts{0}, 3)) + 1, 1),
+							Picked = Table.SelectColumns(DataRows, {Cols{0}, Cols{1}, Cols{p}, "Adjustment", "Row Order"}),
+							Renamed = Table.RenameColumns(Picked, {{Cols{0}, "Code Raw"}, {Cols{1}, "Name Raw"}, {Cols{p}, "Cell"}}),
+							Present = Table.SelectRows(Renamed, each CellText([Cell]) <> ""),
+							WithDate = Table.AddColumn(Present, "Date", each MonthDate, type date),
+							WithPreliminary = Table.AddColumn(WithDate, "Preliminary", each Text.Contains(Label, "(p)"), type logical)
+						in
+							WithPreliminary,
+					Stacked = Table.Combine(List.Transform(MonthPositions, OneMonth)),
+					WithSheet = Table.AddColumn(Stacked, "Sheet Order", each SheetOrder, Int64.Type)
+				in
+					WithSheet,
+			Combined = Table.Combine(List.Transform(Table.ToRecords(SheetsIndexed), each ParseSheet([Data], [Sheet Order]))),
+			Coded = Table.AddColumn(Combined, "Kind Code", each let c = CellText([Code Raw]) in if c = "" then null else c, type text),
+			Named = Table.AddColumn(Coded, "Kind Name", each CellText([Name Raw]), type text),
+			// Key: the NAICS code where the line has one, else the published name (the total and "excl." lines). Labels drift between the two sections (mail order / mail-order), codes do not.
+			Keyed = Table.AddColumn(Named, "Kind Key", each if [Kind Code] = null then [Kind Name] else [Kind Code], type text),
+			// The thirteen three-digit lines that partition "Retail and food services sales, total" with no remainder.
+			TotalCodes = {"441", "442", "443", "444", "445", "446", "447", "448", "451", "452", "453", "454", "722"},
+			Flagged = Table.AddColumn(Keyed, "Include In Total", each List.Contains(TotalCodes, [Kind Code]), type logical),
+			Status = Table.AddColumn(Flagged, "Cell Status", each
+				if [Cell] is number then "Published"
+				else if CellText([Cell]) = "(S)" then "Suppressed"
+				else if CellText([Cell]) = "(NA)" then "Not available"
+				else "Other", type text),
+			// Census prints millions of dollars; the model stores dollars. Suppressed and not-available cells stay blank, never zero.
+			Dollars = Table.AddColumn(Status, "Sales USD", each if [Cell] is number then [Cell] * 1000000 else null, Currency.Type),
+			Kept = Table.SelectColumns(Dollars, {"Date", "Kind Key", "Kind Code", "Kind Name", "Adjustment", "Include In Total", "Sales USD", "Preliminary", "Cell Status", "Sheet Order", "Row Order"}),
+			Typed = Table.TransformColumnTypes(Kept, {{"Adjustment", type text}})
+		in
+			Typed
+	annotation PBI_ResultType = Table

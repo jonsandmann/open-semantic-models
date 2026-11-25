@@ -1,0 +1,58 @@
+/// The CMS quality measures in the Complications and Deaths file, one row per Measure ID (20 in the November 2026 release), built from the distinct measure rows of the source rather than typed by hand. Every measure here is lower-is-better. Scores are on different scales (death rates near 12 per 100, PSI 90 near 1), so average a score within one measure only.
+table 'Quality Measure'
+
+	/// CMS measure identifier, for example MORT_30_AMI or PSI_90. Primary key.
+	column 'Measure ID'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Measure ID
+		sortByColumn: 'Measure Sort'
+
+	/// CMS measure name, for example Death rate for heart attack patients. Sorted by Measure Sort.
+	column 'Measure Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Measure Name
+		sortByColumn: 'Measure Sort'
+
+	/// Measure family: Mortality (MORT_30_* and the hybrid hospital-wide mortality rate Hybrid_HWM), Surgical complication (COMP_HIP_KNEE, ISCMR) or Patient safety (PSI_*). Sorted in that order.
+	column Family
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Family
+		sortByColumn: 'Family Sort'
+
+	/// Sort key for Family: 1 Mortality, 2 Surgical complication, 3 Patient safety.
+	column 'Family Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Family Sort
+
+	/// Sort key for Measure ID and Measure Name: family first, then Measure ID in text order within the family.
+	column 'Measure Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Measure Sort
+
+	partition 'Quality Measure' = m
+		mode: import
+		source =
+			let
+				Source = ComplicationsAndDeaths,
+				Pairs = Table.Distinct(Table.SelectColumns(Source, {"Measure ID", "Measure Name"}), {"Measure ID"}),
+				FamilyOf = (id as text) as text =>
+					if Text.StartsWith(id, "MORT") or id = "Hybrid_HWM" then "Mortality"
+					else if Text.StartsWith(id, "PSI") then "Patient safety"
+					else "Surgical complication",
+				WithFamily = Table.AddColumn(Pairs, "Family", each FamilyOf([Measure ID]), type text),
+				WithFamilySort = Table.AddColumn(WithFamily, "Family Sort", each if [Family] = "Mortality" then 1 else if [Family] = "Surgical complication" then 2 else 3, Int64.Type),
+				Sorted = Table.Sort(WithFamilySort, {{"Family Sort", Order.Ascending}, {"Measure ID", Order.Ascending}}),
+				Indexed = Table.AddIndexColumn(Sorted, "Measure Sort", 1, 1, Int64.Type),
+				Typed = Table.TransformColumnTypes(Indexed, {{"Measure ID", type text}, {"Measure Name", type text}})
+			in
+				Typed

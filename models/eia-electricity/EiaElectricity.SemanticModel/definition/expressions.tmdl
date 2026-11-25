@@ -1,0 +1,8 @@
+/// Folder on eia.gov that holds the EIA-861M (Form EIA-861M, monthly electric power industry report) files. The fact query calls Web.Contents on this folder with RelativePath "xls/sales_revenue.xlsx", so the service sees one static Web data source whose root answers 200 (the xls/ folder itself answers 403, which would fail the service's credential test).
+expression EiaBaseUrl = "https://www.eia.gov/electricity/data/eia861m/" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// First day of the Date table: January 2010, the first month in the EIA-861M state sales file.
+expression CalendarStart = #date(2010, 1, 1) meta [IsParameterQuery = true, Type = "Date", IsParameterQueryRequired = true]
+
+/// Last day of the Date table: 31 December of the current year at refresh time, so the calendar always holds whole years and grows with the file without a manual bump.
+expression CalendarEnd = Date.EndOfYear(Date.From(DateTime.FixedLocalNow()))

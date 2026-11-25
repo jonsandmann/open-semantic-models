@@ -1,0 +1,54 @@
+/// Hour-of-day dimension (24 rows) with day parts that match how taxi demand moves through the day.
+table 'Time of Day'
+
+	/// Hour of day, 0 to 23. Primary key, related to Trips[Pickup Hour].
+	column Hour
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Hour
+
+	/// Hour as a clock label, 00:00 to 23:00. Sorted by Hour.
+	column 'Hour Label'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Hour Label
+		sortByColumn: Hour
+
+	/// Part of the day: Overnight (0-5), Morning Rush (6-9), Midday (10-15), Evening Rush (16-19), Night (20-23). Sorted by Day Part Number.
+	column 'Day Part'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Day Part
+		sortByColumn: 'Day Part Number'
+
+	/// Order of the day parts, 1 (Overnight) to 5 (Night).
+	column 'Day Part Number'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Day Part Number
+
+	partition 'Time of Day' = m
+		mode: import
+		source =
+			let
+				Hours = Table.FromList({0..23}, Splitter.SplitByNothing(), type table [Hour = Int64.Type]),
+				AddLabel = Table.AddColumn(Hours, "Hour Label", each Text.PadStart(Text.From([Hour]), 2, "0") & ":00", type text),
+				AddDayPartNumber = Table.AddColumn(
+					AddLabel,
+					"Day Part Number",
+					each if [Hour] < 6 then 1 else if [Hour] < 10 then 2 else if [Hour] < 16 then 3 else if [Hour] < 20 then 4 else 5,
+					Int64.Type
+				),
+				AddDayPart = Table.AddColumn(
+					AddDayPartNumber,
+					"Day Part",
+					each {"Overnight", "Morning Rush", "Midday", "Evening Rush", "Night"}{[Day Part Number] - 1},
+					type text
+				)
+			in
+				AddDayPart

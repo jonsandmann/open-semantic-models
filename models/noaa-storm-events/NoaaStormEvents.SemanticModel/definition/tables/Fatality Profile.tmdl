@@ -1,0 +1,32 @@
+/// Who died and where, one row per combination present in the fatalities file: direct or indirect, NOAA's place class (vehicle, outside, permanent home and so on, never a street address) and sex. Filters Fact Fatality only.
+table 'Fatality Profile'
+
+	/// Fatality Type, Fatality Location and Sex joined with "|". Primary key, related to 'Fact Fatality'[Profile Key].
+	column 'Profile Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Profile Key
+
+	/// Direct (caused by the weather itself, for example struck by a falling tree) or Indirect (related to the event, for example a car crash on an icy road).
+	column 'Fatality Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fatality Type
+
+	/// NOAA's place class for where the person was, for example Vehicle/Towed Trailer, Outside/Open Areas, Permanent Home, In Water. Unknown when NOAA left it blank or wrote Unknown.
+	column 'Fatality Location'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fatality Location
+
+	/// Female, Male, or Not recorded (blank in the file).
+	column Sex
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Sex
+
+	partition 'Fatality Profile' = m
+		mode: import
+		source = Table.Distinct(Table.SelectColumns(StormFatalities, {"Profile Key", "Fatality Type", "Fatality Location", "Sex"}), {"Profile Key"})

@@ -1,0 +1,47 @@
+/// The ten jurisdictions in the data factory join. Population is Census Vintage 2024 place (or county for Montgomery). Units Published is false where the source has no dwelling-unit field (Boston, New Orleans) or only a 1-per-house proxy (Montgomery County). Static table from the factory's analyze.py and SOURCES.md.
+table Jurisdiction
+
+	/// Jurisdiction name as stored on the fact, for example Austin, TX. Primary key.
+	column Jurisdiction
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Jurisdiction
+
+	/// Census Vintage 2024 resident population of the city (Montgomery County, MD is the county). Denominator of Housing Units per 1,000 per Year.
+	column Population
+		dataType: int64
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Population
+
+	/// True when the source publishes a usable net dwelling-unit count on new residential work. False for Boston, New Orleans and Montgomery County.
+	column 'Units Published'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Units Published
+
+	/// Licence of the published dataset, as verified 24 Nov 2026.
+	column Licence
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Licence
+
+	partition Jurisdiction = m
+		mode: import
+		source =
+				#table(
+					type table [Jurisdiction = text, Population = number, Units Published = logical, Licence = text],
+					{
+						{"Seattle, WA", 780995, true, "Public Domain (data.seattle.gov)"},
+						{"New York, NY", 8478072, true, "NYC Open Data Terms of Use"},
+						{"Chicago, IL", 2721308, true, "City of Chicago Data Portal Terms of Use"},
+						{"San Francisco, CA", 827526, true, "ODC PDDL"},
+						{"Los Angeles, CA", 3878704, true, "City of Los Angeles open data (attribute LADBS)"},
+						{"Austin, TX", 993588, true, "Public Domain U.S. Government"},
+						{"Boston, MA", 673458, false, "ODC PDDL"},
+						{"Philadelphia, PA", 1573916, true, "City of Philadelphia open data licence"},
+						{"New Orleans, LA", 362701, false, "CC0 1.0"},
+						{"Montgomery County, MD", 1082273, false, "Public Domain"}
+					}
+				)

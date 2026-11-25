@@ -1,0 +1,31 @@
+/// Current status as mapped by the data factory from each source's own status string.
+table Status
+
+	/// Status key, related to 'Fact Permit'[Status]. Primary key.
+	column Status
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Status
+
+	/// Display label.
+	column 'Status Label'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Status Label
+
+	partition Status = m
+		mode: import
+		source =
+				#table(
+					type table [Status = text, Status Label = text],
+					{
+						{"applied", "Applied"},
+						{"issued", "Issued"},
+						{"final", "Final"},
+						{"expired_suspended", "Expired / suspended"},
+						{"withdrawn_cancelled", "Withdrawn / cancelled"},
+						{"other", "Other"},
+						{"unknown", "Unknown"}
+					}
+				)

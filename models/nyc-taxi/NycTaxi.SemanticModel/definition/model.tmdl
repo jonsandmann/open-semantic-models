@@ -1,0 +1,28 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_QueryOrder = ["TlcBaseUrl","RangeStart","RangeEnd","CalendarStart","CalendarEnd","TaxiZoneLookup","Trips","Date","Time of Day","Pickup Zone","Dropoff Zone","Vendor","Rate Code","Payment Type"]
+
+ref table Trips
+ref table Date
+ref table 'Time of Day'
+ref table 'Pickup Zone'
+ref table 'Dropoff Zone'
+ref table Vendor
+ref table 'Rate Code'
+ref table 'Payment Type'
+
+ref expression TlcBaseUrl
+ref expression RangeStart
+ref expression RangeEnd
+ref expression CalendarStart
+ref expression CalendarEnd
+ref expression TaxiZoneLookup

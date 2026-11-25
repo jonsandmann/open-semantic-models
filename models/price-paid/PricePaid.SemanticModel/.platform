@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "HM Land Registry Price Paid"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "cf18af34-b907-4b0d-9164-a885ea1ca19e"
+  }
+}

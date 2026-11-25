@@ -1,0 +1,96 @@
+// Acceptance checks run against the deployed model through the executeQueries REST API (tools/dax_checks.py).
+// Q1 to Q10 are the business questions in README.md, pinned to the 28 Oct 2026 monthly update file.
+
+// 1. Q1 August 2026, all standard sales (expected 25,403; median 295,000; mean 359,379.39; total 9,129,314,595)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales", [Sales], "Median", [Median price], "Mean", [Mean price], "Total", [Total consideration] ),
+    'Date'[Year Month] = "2026-08"
+)
+
+// 2. Q2 Greater London, August 2026 (expected 2,500; median 515,000; mean 630,675.02; 17.27% of consideration)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales", [Sales], "Median", [Median price], "Mean", [Mean price], "Share of consideration", [Share of consideration], "Share of sales", [Share of sales] ),
+    'Date'[Year Month] = "2026-08", Location[County] = "GREATER LONDON"
+)
+
+// 3. Q3 Surrey, August 2026 (expected 593; median 490,000; mean 591,964.23)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales", [Sales], "Median", [Median price], "Mean", [Mean price] ),
+    'Date'[Year Month] = "2026-08", Location[County] = "SURREY"
+)
+
+// 4. Q4 County Durham, August 2026 (expected 210; median 156,500; mean 183,956.55)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales", [Sales], "Median", [Median price], "Mean", [Mean price] ),
+    'Date'[Year Month] = "2026-08", Location[County] = "COUNTY DURHAM"
+)
+
+// 5. Q5 and Q6 By property type, August 2026 (expected Detached 6,434 / 425,000 / 505,990.70; Semi 7,873 / 280,000; Terraced 7,293 / 245,000; Flat 3,803 / 225,000; Other blank)
+EVALUATE
+CALCULATETABLE (
+    ADDCOLUMNS ( VALUES ( 'Property Type'[Property Type] ), "Sales", [Sales], "Median", [Median price], "Mean", [Mean price], "Share of sales", [Share of sales] ),
+    'Date'[Year Month] = "2026-08"
+)
+
+// 6. Q7 Leasehold flats in Greater London, August 2026 (expected 1,168; median 400,000; mean 460,679.15)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales", [Sales], "Median", [Median price], "Mean", [Mean price] ),
+    'Date'[Year Month] = "2026-08", Location[County] = "GREATER LONDON", 'Property Type'[Property Type Code] = "F", Duration[Duration] = "Leasehold"
+)
+
+// 7. Q8 Freehold share, August 2026 (expected 20,475 freehold of 25,403, 80.60%)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Freehold", CALCULATE ( [Sales], Duration[Duration] = "Freehold" ), "Sales", [Sales], "Freehold share", [Freehold share] ),
+    'Date'[Year Month] = "2026-08"
+)
+
+// 8. Q9 Price bands, August 2026 (expected 9,426 under 250,000; 563 at 1 million or more)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Under 250k", [Sales under £250,000], "1m or more", [Sales of £1 million or more] ),
+    'Date'[Year Month] = "2026-08"
+)
+
+// 9. Q10 September 2026 in the same file (expected 18,508; median 300,000; mean 360,353.42)
+EVALUATE
+CALCULATETABLE (
+    ROW ( "Sales", [Sales], "Median", [Median price], "Mean", [Mean price] ),
+    'Date'[Year Month] = "2026-09"
+)
+
+// 10. Every remaining measure, August 2026 (expected prior month 4,302 and 280,000 for July; change +15,000; new build 9; all records 28,131; lowest/highest from the file)
+EVALUATE
+CALCULATETABLE (
+    ROW (
+        "Sales prior month", [Sales prior month], "Median prior month", [Median price prior month], "Median change", [Median price change],
+        "New build sales", [New build sales], "All records", [All records], "Deleted", [Deleted records], "Additional", [Additional transfers],
+        "Lowest", [Lowest price], "Highest", [Highest price]
+    ),
+    'Date'[Year Month] = "2026-08"
+)
+
+// 11. Whole file (expected 98,103 records; 1,552 deleted; 17,233 additional not deleted; 79,318 sales; median 300,000; attribution year 2026)
+EVALUATE
+ROW (
+    "All records", [All records], "Deleted", [Deleted records], "Additional", [Additional transfers], "Sales", [Sales],
+    "Median", [Median price], "Attribution", [Attribution],
+    "Locations", COUNTROWS ( Location ), "Districts", DISTINCTCOUNT ( Location[District] ), "Counties", DISTINCTCOUNT ( Location[County] )
+)
+
+// 12. Referential integrity: fact rows with no dimension row (expected all 0)
+EVALUATE
+ROW (
+    "No date", COUNTROWS ( FILTER ( 'Fact Sale', ISBLANK ( RELATED ( 'Date'[Date] ) ) ) ),
+    "No location", COUNTROWS ( FILTER ( 'Fact Sale', ISBLANK ( RELATED ( Location[Location Key] ) ) ) ),
+    "No property type", COUNTROWS ( FILTER ( 'Fact Sale', ISBLANK ( RELATED ( 'Property Type'[Property Type Code] ) ) ) ),
+    "No duration", COUNTROWS ( FILTER ( 'Fact Sale', ISBLANK ( RELATED ( Duration[Duration Code] ) ) ) ),
+    "No build", COUNTROWS ( FILTER ( 'Fact Sale', ISBLANK ( RELATED ( Build[Build] ) ) ) ),
+    "No category", COUNTROWS ( FILTER ( 'Fact Sale', ISBLANK ( RELATED ( Category[Category] ) ) ) ),
+    "No status", COUNTROWS ( FILTER ( 'Fact Sale', ISBLANK ( RELATED ( 'Record Status'[Record Status] ) ) ) )
+)

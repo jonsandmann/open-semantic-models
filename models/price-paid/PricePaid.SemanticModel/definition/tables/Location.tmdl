@@ -1,0 +1,38 @@
+/// Geography, one row per town within a local authority district, as Land Registry publishes them (upper case). Town, district and county only: no address-level field is in the model. A district sits in exactly one county (checked: 320 districts, 114 counties and unitary authorities in the 28 Oct 2026 file). England and Wales only; Price Paid does not cover Scotland or Northern Ireland, and the file carries no region.
+table Location
+
+	/// District and town joined with "|", for example "BRISTOL|BRISTOL". Primary key, related to 'Fact Sale'[Location Key]. A town name alone is not unique (one town spans several districts).
+	column 'Location Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Location Key
+
+	/// Post town as published, for example BRISTOL. Not unique on its own: read it with District or County.
+	column Town
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Town
+
+	/// Local authority district as published, for example CITY OF BRISTOL.
+	column District
+		dataType: string
+		summarizeBy: none
+		sourceColumn: District
+
+	/// County, metropolitan county or unitary authority as published, for example GREATER LONDON or SURREY.
+	column County
+		dataType: string
+		summarizeBy: none
+		sourceColumn: County
+
+	partition Location = m
+		mode: import
+		source =
+			let
+				Source = PricePaid,
+				Picked = Table.SelectColumns(Source, {"Location Key", "Town", "District", "County"}),
+				Distinct = Table.Distinct(Picked, {"Location Key"})
+			in
+				Distinct

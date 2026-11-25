@@ -1,0 +1,11 @@
+relationship 'Fact Retail Sales to Date'
+	fromColumn: 'Fact Retail Sales'.Date
+	toColumn: Date.Date
+
+relationship 'Fact Retail Sales to State'
+	fromColumn: 'Fact Retail Sales'.'State Code'
+	toColumn: State.'State Code'
+
+relationship 'Fact Retail Sales to Sector'
+	fromColumn: 'Fact Retail Sales'.Sector
+	toColumn: Sector.Sector

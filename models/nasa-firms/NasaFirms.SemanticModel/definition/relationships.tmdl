@@ -1,0 +1,27 @@
+relationship 'Fact Detection to Date'
+	fromColumn: 'Fact Detection'.'Acq Date'
+	toColumn: Date.Date
+
+relationship 'Fact Detection to Source'
+	fromColumn: 'Fact Detection'.Source
+	toColumn: Source.Source
+
+relationship 'Fact Detection to Satellite'
+	fromColumn: 'Fact Detection'.Satellite
+	toColumn: Satellite.Satellite
+
+relationship 'Fact Detection to Country'
+	fromColumn: 'Fact Detection'.Country
+	toColumn: Country.Country
+
+relationship 'Fact Detection to Confidence Band'
+	fromColumn: 'Fact Detection'.'Confidence Band'
+	toColumn: 'Confidence Band'.'Confidence Band'
+
+relationship 'Fact Detection to Day Night'
+	fromColumn: 'Fact Detection'.'Day Night'
+	toColumn: 'Day Night'.'Day Night'
+
+relationship 'Fact Detection to Hotspot Type'
+	fromColumn: 'Fact Detection'.'Type Code'
+	toColumn: 'Hotspot Type'.'Type Code'

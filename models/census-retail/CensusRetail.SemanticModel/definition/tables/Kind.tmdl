@@ -1,0 +1,103 @@
+/// Kind of business: every line the Monthly Retail Trade workbook publishes, 64 in the November 2026 file. NAICS lines nest (441 > 4411 > 44111) and the uncoded lines are totals or "excl." aggregates, so only the thirteen lines with Include In Total add up; Parent Code and Level describe the nesting. Built from the workbook itself, so labels follow Census.
+table Kind
+
+	/// Key of the line: the NAICS code where there is one (441, 4541, 4411,4412, 722513, 722514, 722515), else the published name of an uncoded total or "excl." line. Primary key, related to 'Fact Retail Sales'[Kind Key].
+	column 'Kind Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Kind Key
+
+	/// Code and name, for example "447 Gasoline stations", or the name alone for the uncoded totals. Unique; the column to put on visuals. Sorted in the workbook's order.
+	column Kind
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Kind
+		sortByColumn: 'Kind Sort'
+
+	/// NAICS code or codes as Census prints them, for example 441 or 4411,4412. Blank on the total and "excl." lines.
+	column 'Kind Code'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Kind Code
+
+	/// The published label, from the newest year's not seasonally adjusted section (Census's wording drifts slightly between sections and years). Not unique: 4522 and 45221 are both "Department stores".
+	column 'Kind Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Kind Name
+
+	/// Line order in the workbook (newest year, not seasonally adjusted section): the total lines first, then 441 down to 722. Sort key for Kind.
+	column 'Kind Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Kind Sort
+
+	/// Total or aggregate (uncoded total and "excl." lines, and GAFO), Combined codes (a line spanning several codes, such as 442,443) or NAICS code.
+	column 'Kind Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Kind Type
+
+	/// True for the thirteen three-digit lines (441-448, 451-454, 722) that partition "Retail and food services sales, total" with no remainder; the Sales measure adds only these.
+	column 'Include In Total'
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Include In Total
+
+	/// Kind Key of the line this one nests in: the longest shorter prefix of its (first) code that the workbook publishes, for example 44111 > 4411, 4541 > 454, 443141 > 443. Blank for three-digit lines and uncoded lines.
+	column 'Parent Code'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Parent Code
+
+	/// Code and name of the parent line, for example "454 Nonstore retailers". Blank where there is no parent.
+	column 'Parent Kind'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Parent Kind
+
+	/// Digits in the line's (first) NAICS code: 3 for subsectors such as 441, up to 6; 0 for the uncoded total and "excl." lines.
+	column Level
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Level
+
+	partition Kind = m
+		mode: import
+		source =
+			let
+				Source = MrtsCells,
+				// The first appearance of each key (newest sheet, not adjusted section first, then row order) gives its label and sort position.
+				Ordered = Table.AddColumn(Source, "Order", each [Sheet Order] * 1000 + (if [Adjustment] = "Not seasonally adjusted" then 0 else 500) + [Row Order], Int64.Type),
+				Grouped = Table.Group(Ordered, {"Kind Key"}, {{"First", each Table.First(Table.Sort(_, {{"Order", Order.Ascending}})), type record}}),
+				Kinds = Table.FromRecords(List.Transform(Grouped[First], each [
+					Kind Key = [Kind Key], Kind Code = [Kind Code], Kind Name = [Kind Name],
+					Include In Total = [Include In Total], Kind Sort = [Order]
+				])),
+				Codes = List.RemoveNulls(Kinds[Kind Code]),
+				FirstCode = (c as nullable text) as nullable text => if c = null then null else Text.Trim(Text.Split(c, ","){0}),
+				WithLabel = Table.AddColumn(Kinds, "Kind", each if [Kind Code] = null then [Kind Name] else [Kind Code] & " " & [Kind Name], type text),
+				WithType = Table.AddColumn(WithLabel, "Kind Type", each
+					if [Kind Code] = null then "Total or aggregate"
+					else if Text.Contains([Kind Code], ",") then "Combined codes"
+					else "NAICS code", type text),
+				WithLevel = Table.AddColumn(WithType, "Level", each let f = FirstCode([Kind Code]) in if f = null then 0 else Text.Length(f), Int64.Type),
+				WithParent = Table.AddColumn(WithLevel, "Parent Code", each
+					let
+						f = FirstCode([Kind Code]),
+						Prefixes = if f = null or Text.Length(f) <= 3 then {} else List.Transform(List.Reverse({3 .. Text.Length(f) - 1}), (n) => Text.Start(f, n)),
+						Found = List.Select(Prefixes, (p) => List.Contains(Codes, p))
+					in
+						List.First(Found, null), type text),
+				Labels = Table.SelectColumns(WithLabel, {"Kind Key", "Kind"}),
+				Joined = Table.NestedJoin(WithParent, {"Parent Code"}, Labels, {"Kind Key"}, "Parent", JoinKind.LeftOuter),
+				WithParentKind = Table.AddColumn(Joined, "Parent Kind", each if Table.IsEmpty([Parent]) then null else [Parent]{0}[Kind], type text),
+				Kept = Table.SelectColumns(WithParentKind, {"Kind Key", "Kind", "Kind Code", "Kind Name", "Kind Sort", "Kind Type", "Include In Total", "Parent Code", "Parent Kind", "Level"}),
+				Typed = Table.TransformColumnTypes(Kept, {{"Kind Key", type text}, {"Kind Code", type text}, {"Kind Name", type text}, {"Kind Sort", Int64.Type}, {"Include In Total", type logical}})
+			in
+				Typed

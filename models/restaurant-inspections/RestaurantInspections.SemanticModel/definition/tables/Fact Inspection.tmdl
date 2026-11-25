@@ -1,0 +1,237 @@
+/// Fact table: one row per inspection across the ten jurisdictions (the data factory's joined inspections.parquet), with the counts of violations and critical violations it cited and its common burden score. Violations are a second fact at a finer grain ('Fact Violation'), related to this table by Inspection Key, so inspection counts never multiply by violations. Compare jurisdictions on findings (critical violations per inspection, the re-inspection and closure rates at 3+ criticals), not on published outcomes: each jurisdiction's "fail" is a different event (Jurisdiction[Fail Means]). Every column is hidden; analysis goes through the measures and the dimensions.
+table 'Fact Inspection'
+
+	/// Inspections in context, every jurisdiction and type. Austin's count includes score-only inspections with no violation data.
+	measure Inspections = COUNTROWS ( 'Fact Inspection' )
+		formatString: #,0
+		displayFolder: Inspections
+
+	/// Inspections in jurisdictions that publish violations (all but Austin): the denominator of every per-inspection violation measure, so Austin's score-only inspections never dilute a rate.
+	measure 'Inspections with violation data' = CALCULATE ( [Inspections], KEEPFILTERS ( Jurisdiction[Publishes Violations] = TRUE () ) )
+		formatString: #,0
+		displayFolder: Inspections
+
+	/// Distinct establishments with an inspection in context.
+	measure 'Establishments inspected' = DISTINCTCOUNT ( 'Fact Inspection'[Establishment Key] )
+		formatString: #,0
+		displayFolder: Inspections
+
+	/// Inspections per establishment inspected in context.
+	measure 'Inspections per establishment' = DIVIDE ( [Inspections], [Establishments inspected] )
+		formatString: 0.00
+		displayFolder: Inspections
+
+	/// Share of inspections in context that came within 60 days of an earlier visit to the same establishment (Visit Kind). High in Boston, whose follow-ups are published as routine visits.
+	measure 'Follow-up share' = DIVIDE ( COALESCE ( CALCULATE ( [Inspections], KEEPFILTERS ( 'Visit Kind'[Visit Kind Key] = 2 ) ), 0 ), [Inspections] )
+		formatString: 0.0%
+		displayFolder: Inspections
+
+	/// Share of inspections with violation data that cited no violation at all. Recording habits differ: a jurisdiction that lists only failing visits' violations (Boston) looks cleaner or dirtier for reasons of publishing, not kitchens.
+	measure 'Share with no violation' = DIVIDE ( COALESCE ( CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Fact Inspection'[Violation Count] = 0 ) ), 0 ), [Inspections with violation data] )
+		formatString: 0.0%
+		displayFolder: Findings
+
+	/// Mean common burden score, 0 to 100: 100 minus 7 per critical and 2 per non-critical violation, floored at 0 (Austin: its own 100-point score). A burden index, not a measured risk: what counts as critical, and how many rows one problem becomes, differ by jurisdiction. 100 means nothing was cited, not that the place is safe.
+	measure 'Average burden score' = AVERAGE ( 'Fact Inspection'[Burden Score] )
+		formatString: 0.0
+		displayFolder: Findings
+
+	/// Inspections with violation data that cited three or more critical violations (each jurisdiction's own critical flag).
+	measure 'Inspections with 3+ criticals' = CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Critical Band'[Critical Band Key] = 3 ) )
+		formatString: #,0
+		displayFolder: Findings
+
+	/// Share of inspections with violation data that cited three or more critical violations.
+	measure 'Share with 3+ criticals' = DIVIDE ( COALESCE ( [Inspections with 3+ criticals], 0 ), [Inspections with violation data] )
+		formatString: 0.0%
+		displayFolder: Findings
+
+	/// Inspections with a published verdict mapped to a tier (blank tier excluded: Delaware and New York State publish no verdict; no-entry, out-of-business and educational visits have none).
+	measure 'Inspections with a verdict' = CALCULATE ( [Inspections], KEEPFILTERS ( NOT ISBLANK ( Outcome[Tier] ) ) )
+		formatString: #,0
+		displayFolder: Outcomes
+
+	/// Comparable across jurisdictions. Of rated inspections that cited three or more critical violations, the share whose verdict ordered a re-inspection or worse (tier 2 or 3: conditional pass, fail, B or C grade, closure). Holds the findings constant, so it compares how jurisdictions act on the same findings. Toronto's critical includes Significant items, which is most of its lower rate.
+	measure 'Re-inspection rate at 3+ criticals' =
+			VAR AtThree = CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( 'Critical Band'[Critical Band Key] = 3 ) )
+			VAR Acted = CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( 'Critical Band'[Critical Band Key] = 3 ), KEEPFILTERS ( Outcome[Tier] >= 2 ) )
+			RETURN
+				DIVIDE ( COALESCE ( Acted, 0 ), AtThree )
+		formatString: 0.0%
+		displayFolder: Outcomes
+
+	/// Closures (Outcome[Closed]) in context.
+	measure Closures = CALCULATE ( [Inspections], KEEPFILTERS ( Outcome[Closed] = TRUE () ) )
+		formatString: #,0
+		displayFolder: Outcomes
+
+	/// Closures as a share of rated inspections. A closure is the one verdict that means the same everywhere, but the findings behind it still differ: read it at a fixed Critical Band, or use Closure rate at 3+ criticals.
+	measure 'Closure rate' = DIVIDE ( COALESCE ( [Closures], 0 ), [Inspections with a verdict] )
+		formatString: 0.0%
+		displayFolder: Outcomes
+
+	/// Comparable across jurisdictions. Of rated inspections that cited three or more critical violations, the share that closed the establishment.
+	measure 'Closure rate at 3+ criticals' =
+			DIVIDE (
+				COALESCE ( CALCULATE ( [Closures], KEEPFILTERS ( 'Critical Band'[Critical Band Key] = 3 ) ), 0 ),
+				CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( 'Critical Band'[Critical Band Key] = 3 ) )
+			)
+		formatString: 0.0%
+		displayFolder: Outcomes
+
+	/// NOT COMPARABLE ACROSS JURISDICTIONS. The share of rated inspections whose published verdict is the jurisdiction's worst (tier 3: Boston and Chicago fail, King County Unsatisfactory, Toronto and Marin closure, NYC C grade or closure). Each jurisdiction's tier 3 is a different event with a different trigger (Jurisdiction[Fail Means]), so Boston's 40% and Toronto's 0.1% compare rulebooks, not kitchens. Use it within one jurisdiction over time; across jurisdictions use Critical violations per inspection and the rates at 3+ criticals.
+	measure 'Published outcome' = DIVIDE ( COALESCE ( CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( Outcome[Tier] = 3 ) ), 0 ), [Inspections with a verdict] )
+		formatString: 0.0%
+		displayFolder: Outcomes
+
+	/// Latest inspection date in the model, ignoring every filter (Delaware publishes two inspections dated 4 December 2026). The prior-year measures read it.
+	measure 'Last inspection date' = CALCULATE ( MAX ( 'Fact Inspection'[Inspection Date] ), REMOVEFILTERS () )
+		formatString: yyyy-mm-dd
+		isHidden
+		displayFolder: Time
+
+	/// Inspections in the same period one year earlier, over the days up to the last inspection date. Jurisdictions start on different dates (Jurisdiction[Data From]): Austin and Toronto from November 2023, Montgomery from June 2024, Delaware from November 2024, so their prior years before those dates are partial or empty.
+	measure 'Inspections prior year' =
+			VAR LastDay = [Last inspection date]
+			RETURN
+				CALCULATE ( [Inspections], SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+		formatString: #,0
+		displayFolder: Time
+
+	/// Change in inspections against the same period a year earlier, as a percentage of the prior year.
+	measure 'Inspections YoY %' = IF ( NOT ISBLANK ( [Inspections] ), DIVIDE ( [Inspections] - [Inspections prior year], [Inspections prior year] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Time
+
+	/// Inspection id, <jurisdiction>:<publisher's inspection id> (or establishment and date where none is published). Primary key; 'Fact Violation' relates to it.
+	column 'Inspection Key'
+		dataType: string
+		isHidden
+		isKey
+		summarizeBy: none
+		sourceColumn: Inspection Key
+
+	/// Establishment key, foreign key to Establishment (<jurisdiction>:(unknown) for the 93 inspections published without one).
+	column 'Establishment Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Establishment Key
+
+	/// Jurisdiction id, foreign key to Jurisdiction.
+	column 'Jurisdiction Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Jurisdiction Key
+
+	/// Inspection date (no time of day), foreign key to Date.
+	column 'Inspection Date'
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		summarizeBy: none
+		sourceColumn: Inspection Date
+
+	/// Normalized inspection type, foreign key to Inspection Type.
+	column 'Inspection Type Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Inspection Type Key
+
+	/// Jurisdiction, published result and tier, foreign key to Outcome.
+	column 'Outcome Key'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Outcome Key
+
+	/// Critical violations cited, capped at 3 (3 means three or more), foreign key to Critical Band.
+	column 'Critical Band Key'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Critical Band Key
+
+	/// 1 first visit, 2 within 60 days of an earlier visit to the same establishment; foreign key to Visit Kind.
+	column 'Visit Kind Key'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Visit Kind Key
+
+	/// Days since the establishment's previous visit on an earlier date (any type); blank for its first visit in the data.
+	column 'Days Since Previous Visit'
+		isAvailableInMdx: false
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Days Since Previous Visit
+
+	/// Violations cited at this inspection (0 for Austin, which publishes none).
+	column 'Violation Count'
+		isAvailableInMdx: false
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Violation Count
+
+	/// Critical violations cited at this inspection.
+	column 'Critical Count'
+		isAvailableInMdx: false
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Critical Count
+
+	/// Common burden score 0 to 100 (Austin: its native 100-point score).
+	column 'Burden Score'
+		isAvailableInMdx: false
+		dataType: decimal
+		isHidden
+		formatString: 0.0
+		summarizeBy: none
+		sourceColumn: Burden Score
+
+	/// The publisher's own score, unchanged (NYC points, Austin score, King County points).
+	column 'Native Score'
+		isAvailableInMdx: false
+		dataType: decimal
+		isHidden
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: Native Score
+
+	/// The publisher's own grade, unchanged (NYC letter grade).
+	column 'Native Grade'
+		isAvailableInMdx: false
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Native Grade
+
+	partition 'Fact Inspection' = m
+		mode: import
+		source =
+				let
+					Raw = Parquet.Document(InspectionFiles{[Name = "inspections.parquet"]}[Content]),
+					Kept = Table.SelectColumns(Raw, {"insp_id", "est_id", "source", "date", "type_norm", "result_raw", "tier", "n_violations", "n_critical", "norm_score", "native_score", "native_grade"}),
+					Keyed = Table.TransformColumns(Table.AddColumn(Kept, "Establishment Key", each if [est_id] = null then [source] & ":(unknown)" else [est_id], type text), {{"date", each Date.From(_), type date}}),
+					Visits = Table.Distinct(Table.SelectColumns(Keyed, {"Establishment Key", "date"})),
+					Grouped = Table.Group(Visits, {"Establishment Key"}, {{"t", each let d = List.Sort([date]) in Table.FromColumns({d, {null} & List.RemoveLastN(d, 1)}, type table [date = date, prev_date = nullable date]), type table [date = date, prev_date = nullable date]}}),
+					Previous = Table.ExpandTableColumn(Grouped, "t", {"date", "prev_date"}),
+					Joined = Table.ExpandTableColumn(Table.NestedJoin(Keyed, {"Establishment Key", "date"}, Previous, {"Establishment Key", "date"}, "p", JoinKind.LeftOuter), "p", {"prev_date"}),
+					Days = Table.AddColumn(Joined, "Days Since Previous Visit", each if [prev_date] = null then null else Duration.Days([date] - [prev_date]), Int64.Type),
+					Outcome = Table.AddColumn(Days, "Outcome Key", each [source] & "|" & (if [result_raw] = null then "" else [result_raw]) & "|" & (if [tier] = null then "" else Number.ToText([tier], "0")), type text),
+					Band = Table.AddColumn(Outcome, "Critical Band Key", each List.Min({if [n_critical] = null then 0 else [n_critical], 3}), Int64.Type),
+					Visit = Table.AddColumn(Band, "Visit Kind Key", each if [Days Since Previous Visit] <> null and [Days Since Previous Visit] <= 60 then 2 else 1, Int64.Type),
+					Renamed = Table.RenameColumns(Visit, {{"insp_id", "Inspection Key"}, {"source", "Jurisdiction Key"}, {"date", "Inspection Date"}, {"type_norm", "Inspection Type Key"}, {"n_violations", "Violation Count"}, {"n_critical", "Critical Count"}, {"norm_score", "Burden Score"}, {"native_score", "Native Score"}, {"native_grade", "Native Grade"}}),
+					Final = Table.TransformColumnTypes(Table.SelectColumns(Renamed, {"Inspection Key", "Establishment Key", "Jurisdiction Key", "Inspection Date", "Inspection Type Key", "Outcome Key", "Critical Band Key", "Visit Kind Key", "Days Since Previous Visit", "Violation Count", "Critical Count", "Burden Score", "Native Score", "Native Grade"}), {{"Inspection Key", type text}, {"Jurisdiction Key", type text}, {"Inspection Date", type date}, {"Inspection Type Key", type text}, {"Violation Count", Int64.Type}, {"Critical Count", Int64.Type}, {"Burden Score", Currency.Type}, {"Native Score", Currency.Type}, {"Native Grade", type text}})
+				in
+					Final

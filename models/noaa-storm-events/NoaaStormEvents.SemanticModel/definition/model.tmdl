@@ -1,0 +1,33 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation Citation = NOAA National Centers for Environmental Information, Storm Events Database, bulk CSV, https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/. Public domain (US government work).
+
+annotation PBI_QueryOrder = ["StormEventsBaseUrl","FirstYear","LastYear","LatestFiles","StormDetails","StormFatalities","Calendar","Fact Event","Fact Fatality","State","Event Type","Area Type","Tornado Scale","Fatality Profile","Date","End Date","Fatality Date"]
+
+ref table 'Fact Event'
+ref table 'Fact Fatality'
+ref table State
+ref table 'Event Type'
+ref table 'Area Type'
+ref table 'Tornado Scale'
+ref table 'Fatality Profile'
+ref table Date
+ref table 'End Date'
+ref table 'Fatality Date'
+
+ref expression StormEventsBaseUrl
+ref expression FirstYear
+ref expression LastYear
+ref expression LatestFiles
+ref expression StormDetails
+ref expression StormFatalities
+ref expression Calendar

@@ -1,0 +1,28 @@
+relationship 'Fact Measure Result to Hospital'
+	fromColumn: 'Fact Measure Result'.'Facility ID'
+	toColumn: Hospital.'Facility ID'
+
+relationship 'Fact Measure Result to Quality Measure'
+	fromColumn: 'Fact Measure Result'.'Measure ID'
+	toColumn: 'Quality Measure'.'Measure ID'
+
+relationship 'Fact Measure Result to Performance Date (End Date)'
+	fromColumn: 'Fact Measure Result'.'End Date'
+	toColumn: 'Performance Date'.Date
+
+relationship 'Fact Measure Result to Performance Date (Start Date)'
+	isActive: false
+	fromColumn: 'Fact Measure Result'.'Start Date'
+	toColumn: 'Performance Date'.Date
+
+relationship 'Fact Measure Result to Release Date'
+	fromColumn: 'Fact Measure Result'.'Release Date'
+	toColumn: 'Release Date'.Date
+
+relationship 'Fact Overall Rating to Hospital'
+	fromColumn: 'Fact Overall Rating'.'Facility ID'
+	toColumn: Hospital.'Facility ID'
+
+relationship 'Fact Overall Rating to Release Date'
+	fromColumn: 'Fact Overall Rating'.'Release Date'
+	toColumn: 'Release Date'.Date

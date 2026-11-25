@@ -1,0 +1,30 @@
+/// Root of the NYC Taxi & Limousine Commission public trip-record files (CloudFront). Source queries call Web.Contents on this base plus a folder (trip-data/, misc/) with a RelativePath, so the service sees two static Web data sources whose roots answer 200 (the bare host answers 403, which fails the service's credential test).
+expression TlcBaseUrl = "https://d37ci6vzurychx.cloudfront.net/" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// Incremental refresh lower bound (inclusive) on the trip pickup time. In Power BI Desktop it sets the development window; the service replaces it per partition.
+expression RangeStart = #datetime(2025, 1, 1, 0, 0, 0) meta [IsParameterQuery = true, Type = "DateTime", IsParameterQueryRequired = true]
+
+/// Incremental refresh upper bound (exclusive) on the trip pickup time. The default loads two months (about 7 million trips) for development.
+expression RangeEnd = #datetime(2025, 3, 1, 0, 0, 0) meta [IsParameterQuery = true, Type = "DateTime", IsParameterQueryRequired = true]
+
+/// First day of the Date table. Kept apart from RangeStart so the calendar stays whole when the service rewrites the refresh range.
+expression CalendarStart = #date(2023, 1, 1) meta [IsParameterQuery = true, Type = "Date", IsParameterQueryRequired = true]
+
+/// Last day of the Date table (inclusive). Use whole calendar years so year-to-date and prior-year logic see complete years.
+expression CalendarEnd = #date(2026, 12, 31) meta [IsParameterQuery = true, Type = "Date", IsParameterQueryRequired = true]
+
+/// Shared query: the TLC taxi zone lookup (265 zones with borough and service zone). Both Pickup Zone and Dropoff Zone are built from it.
+expression TaxiZoneLookup =
+		let
+			Source = Csv.Document(
+				Web.Contents(TlcBaseUrl & "misc/", [RelativePath = "taxi_zone_lookup.csv"]),
+				[Delimiter = ",", Columns = 4, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]
+			),
+			Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+			Renamed = Table.RenameColumns(Promoted, {{"LocationID", "Location ID"}, {"service_zone", "Service Zone"}}),
+			Typed = Table.TransformColumnTypes(
+				Renamed,
+				{{"Location ID", Int64.Type}, {"Borough", type text}, {"Zone", type text}, {"Service Zone", type text}}
+			)
+		in
+			Typed
