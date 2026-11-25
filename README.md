@@ -26,6 +26,8 @@ Each model lives in `models/<name>/` with:
 | [Restaurant Inspections](models/restaurant-inspections/README.md) | Our data factory's join of ten open restaurant-inspection datasets (NYC, Chicago, King County, Austin, Montgomery MD, Delaware, Marin, NY State, Boston, Toronto), 15-category violation crosswalk | Inputs public domain or open; Toronto OGL and Marin ODbL attribution required | One row per inspection; one row per violation | 582K inspections, 1.18M violations (2023-2026) |
 | [Building Permits](models/building-permits/README.md) | Our data factory's join of ten open building-permit datasets (Seattle, NYC, Chicago, SF, LA, Austin, Boston, Philadelphia, New Orleans, Montgomery County MD), 14-category work crosswalk | Inputs public domain or open; NYC, Chicago, Philadelphia and LA terms as published | One row per permit | 1.52M permits (2023-2026) |
 
+Every model also has an [Apache Ossie](https://github.com/apache/ossie) twin in `models/<name>/ossie/`, with a verdict for each measure: 92 of the 237 measures port to Ossie SQL. See [ossie/README.md](ossie/README.md).
+
 ## Validating a model
 
 Every model must load in the Tabular Object Model (TOM) and pass the rule checks before it is committed:

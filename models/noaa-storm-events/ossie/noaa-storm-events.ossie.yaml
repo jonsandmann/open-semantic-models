@@ -1,0 +1,1276 @@
+# Apache Ossie Core Metadata Specification twin of models/noaa-storm-events (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: noaa_storm_events
+datasets:
+- name: area_type
+  source: noaa_storm_events.area_type
+  description: Whether NOAA filed the event against a county or a forecast zone. Both are events; a zone is not
+    the sum of its counties, so there is no rollup from one to the other.
+  primary_key:
+  - cz_type
+  fields:
+  - name: cz_type
+    expression:
+      sql: cz_type
+    datatype: String
+    description: 'NOAA''s code: C county or parish, Z forecast zone, M marine zone. Primary key, related to ''Fact
+      Event''[CZ Type].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: area_type
+    expression:
+      sql: area_type
+    datatype: String
+    description: County, Zone or Marine zone.
+- name: date
+  source: noaa_storm_events.date
+  description: 'Event begin calendar: one row per day from 1 January of FirstYear to 31 December of LastYear. Marked
+    as a date table. Related only to ''Fact Event''[Begin Date], so a slicer here means the day the event began
+    ("storms in May"). Prior-year and year-to-date measures use this table. It does not filter End Date or Fatality
+    Date; sync slicers in the report if a page needs one date across all three.'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Event'[Begin Date] (the day the event began).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: end_date
+  source: noaa_storm_events.end_date
+  description: 'Event end calendar: the same days as Date, as a separate marked date table. Related only to ''Fact
+    Event''[End Date], so a slicer here means the day the event ended, not the day it began.'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Event'[End Date] (the day the event ended).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: event_type
+  source: noaa_storm_events.event_type
+  description: NOAA's event types (Directive 10-1605), one row per type present in the loaded files, with a broad
+    group for filtering. Tornado, hail and thunderstorm wind stay separate types, so magnitudes in different units
+    are never averaged together. The group is a label only; it is not a second grain.
+  primary_key:
+  - event_type
+  fields:
+  - name: event_type
+    expression:
+      sql: event_type
+    datatype: String
+    description: Event type as NOAA publishes it, for example Tornado, Hail, Flash Flood. Primary key, related to
+      'Fact Event'[Event Type].
+  - name: event_group
+    expression:
+      sql: event_group
+    datatype: String
+    description: 'Broad group: Convective, Flood, Winter, Tropical, Heat and drought, Wind, or Other. For filtering,
+      not for adding as its own fact.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Event Group Sort
+  - name: event_group_sort
+    expression:
+      sql: event_group_sort
+    datatype: Integer
+    description: Sort order for Event Group, 1 to 7.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: fact_event
+  source: noaa_storm_events.fact_event
+  description: 'Fact table: NOAA Storm Events details, one row per event id (the county or zone segment of a storm),
+    from the latest vintage of each data year loaded. Damage and the event''s death and injury counts live here;
+    sum event rows, never the locations file and never an episode total on top. Every column is hidden; analysis
+    goes through the measures and the dimensions. Source: NOAA NCEI Storm Events Database, public domain.'
+  primary_key:
+  - event_id
+  fields:
+  - name: event_id
+    expression:
+      sql: event_id
+    datatype: String
+    description: NOAA's event id. Primary key; related from 'Fact Fatality'[Event ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: episode_id
+    expression:
+      sql: episode_id
+    datatype: String
+    description: 'NOAA''s episode id: the storm system the event belongs to. Not a key; read through Episodes.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: begin_date
+    expression:
+      sql: begin_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Day the event began (local standard time of the county or zone). Foreign key to 'Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: end_date
+    expression:
+      sql: end_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Day the event ended. Foreign key to 'End Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: state
+    expression:
+      sql: state
+    datatype: String
+    description: State, territory or marine area name. Foreign key to State[State].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: event_type
+    expression:
+      sql: event_type
+    datatype: String
+    description: Event type. Foreign key to 'Event Type'[Event Type].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: cz_type
+    expression:
+      sql: cz_type
+    datatype: String
+    description: C county, Z zone, M marine zone. Foreign key to 'Area Type'[CZ Type].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: cz_name
+    expression:
+      sql: cz_name
+    datatype: String
+    description: County or zone name as published. Not a key on its own (names repeat across states).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: property_damage_usd
+    expression:
+      sql: property_damage_usd
+    datatype: Decimal
+    description: Property damage in US dollars, parsed from DAMAGE_PROPERTY (K thousands, M millions, B billions).
+      Blank when NOAA left it blank, never zero-filled.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0
+  - name: crop_damage_usd
+    expression:
+      sql: crop_damage_usd
+    datatype: Decimal
+    description: Crop damage in US dollars, parsed from DAMAGE_CROPS. Blank when NOAA left it blank.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0
+  - name: deaths_direct
+    expression:
+      sql: deaths_direct
+    datatype: Integer
+    description: Direct deaths on the event row.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: deaths_indirect
+    expression:
+      sql: deaths_indirect
+    datatype: Integer
+    description: Indirect deaths on the event row.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: injuries_direct
+    expression:
+      sql: injuries_direct
+    datatype: Integer
+    description: Direct injuries on the event row.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: injuries_indirect
+    expression:
+      sql: injuries_indirect
+    datatype: Integer
+    description: Indirect injuries on the event row.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: tornado_scale
+    expression:
+      sql: tornado_scale
+    datatype: String
+    description: Tornado rating (EF0 to EF5, EFU), None for every other event. Foreign key to 'Tornado Scale'[Tornado
+      Scale].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: tornado_length_miles
+    expression:
+      sql: tornado_length_miles
+    datatype: Decimal
+    description: Tornado segment path length in miles. Blank except tornadoes.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0.00'
+  - name: tornado_width_yards
+    expression:
+      sql: tornado_width_yards
+    datatype: Integer
+    description: Tornado path width in yards. Blank except tornadoes.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0'
+  - name: magnitude
+    expression:
+      sql: magnitude
+    datatype: Decimal
+    description: Magnitude; its unit depends on the event type (hail size in inches, wind speed in knots). Not additive;
+      read through Average magnitude for one type.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.00'
+  - name: file_built
+    expression:
+      sql: file_built
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Creation date of the file the row came from (the c date in the file name).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  metrics:
+  - name: events
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: 'Storm events (event ids) in the filter context. One row per event: a county or zone segment of
+      a storm, not the storm system.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( 'Fact Event' )
+        format_string: '#,0'
+        display_folder: Volume
+  - name: episodes
+    expression:
+      sql: COUNT(DISTINCT episode_id)
+    datatype: Integer
+    description: Storm systems (distinct episode ids) in the filter context. An episode spans several events; this
+      is not a sum of events.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DISTINCTCOUNT ( 'Fact Event'[Episode ID] )
+        format_string: '#,0'
+        display_folder: Volume
+  - name: states_in_scope
+    expression:
+      sql: COUNT(DISTINCT state)
+    datatype: Integer
+    description: States, territories and marine areas with at least one event in the filter context.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DISTINCTCOUNT ( 'Fact Event'[State] )
+        format_string: '0'
+        display_folder: Volume
+  - name: property_damage
+    expression:
+      sql: SUM(property_damage_usd)
+    datatype: Decimal
+    description: Reported property damage in US dollars. A blank damage cell is left out (unknown, not zero).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Event'[Property Damage USD] )
+        format_string: $#,0
+        display_folder: Loss
+  - name: crop_damage
+    expression:
+      sql: SUM(crop_damage_usd)
+    datatype: Decimal
+    description: Reported crop damage in US dollars. A blank damage cell is left out (unknown, not zero).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Event'[Crop Damage USD] )
+        format_string: $#,0
+        display_folder: Loss
+  - name: total_damage
+    expression:
+      sql: SUM(COALESCE(property_damage_usd, 0) + COALESCE(crop_damage_usd, 0))
+    datatype: Decimal
+    description: Property plus crop damage, row by row, with a blank cell counted as nothing. Events with both cells
+      blank add nothing.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUMX ( 'Fact Event', COALESCE ( 'Fact Event'[Property Damage USD], 0 ) + COALESCE ( 'Fact Event'[Crop
+          Damage USD], 0 ) )
+        format_string: $#,0
+        display_folder: Loss
+  - name: events_with_property_damage
+    expression:
+      sql: COUNT(*) FILTER (WHERE property_damage_usd > 0)
+    datatype: Decimal
+    description: Events with a property damage figure above zero.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Events], KEEPFILTERS ( 'Fact Event'[Property Damage USD] > 0 ) )
+        format_string: '#,0'
+        display_folder: Loss
+  - name: damage_per_event
+    expression:
+      sql: SUM(COALESCE(property_damage_usd, 0) + COALESCE(crop_damage_usd, 0)) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Total damage divided by every event in the filter context, including events with no damage figure.
+      A reported loss per event, not the mean of the damage column.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Total damage], [Events] )
+        format_string: $#,0
+        display_folder: Loss
+  - name: deaths
+    expression:
+      sql: SUM(COALESCE(deaths_direct, 0) + COALESCE(deaths_indirect, 0))
+    datatype: Decimal
+    description: Direct plus indirect deaths recorded on the event rows. Does not read the fatalities file; never
+      add it to Fatality records.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUMX ( 'Fact Event', COALESCE ( 'Fact Event'[Deaths Direct], 0 ) + COALESCE ( 'Fact Event'[Deaths Indirect],
+          0 ) )
+        format_string: '#,0'
+        display_folder: Deaths
+  - name: direct_deaths
+    expression:
+      sql: SUM(deaths_direct)
+    datatype: Decimal
+    description: Direct deaths recorded on the event rows (caused by the weather itself).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Event'[Deaths Direct] )
+        format_string: '#,0'
+        display_folder: Deaths
+  - name: indirect_deaths
+    expression:
+      sql: SUM(deaths_indirect)
+    datatype: Decimal
+    description: Indirect deaths recorded on the event rows (related to the event, for example a road crash).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Event'[Deaths Indirect] )
+        format_string: '#,0'
+        display_folder: Deaths
+  - name: injuries
+    expression:
+      sql: SUM(COALESCE(injuries_direct, 0) + COALESCE(injuries_indirect, 0))
+    datatype: Decimal
+    description: Direct plus indirect injuries recorded on the event rows.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUMX ( 'Fact Event', COALESCE ( 'Fact Event'[Injuries Direct], 0 ) + COALESCE ( 'Fact Event'[Injuries
+          Indirect], 0 ) )
+        format_string: '#,0'
+        display_folder: Deaths
+  - name: events_with_a_death
+    expression:
+      sql: COUNT(*) FILTER (WHERE COALESCE(deaths_direct, 0) + COALESCE(deaths_indirect, 0) > 0)
+    datatype: Integer
+    description: Events with at least one direct or indirect death on the row.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( FILTER ( 'Fact Event', COALESCE ( 'Fact Event'[Deaths Direct], 0 ) + COALESCE ( 'Fact Event'[Deaths
+          Indirect], 0 ) > 0 ) )
+        format_string: '#,0'
+        display_folder: Deaths
+  - name: tornadoes
+    expression:
+      sql: COUNT(*) FILTER (WHERE event_type = 'Tornado')
+    datatype: Decimal
+    description: Tornado events in the filter context. Keeps any event type filter, so a Hail row shows blank and
+      a Tornado row its count.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Events], KEEPFILTERS ( 'Event Type'[Event Type] = "Tornado" ) )
+        format_string: '#,0'
+        display_folder: Tornado
+  - name: tornado_path_miles
+    expression:
+      sql: SUM(tornado_length_miles) FILTER (WHERE event_type = 'Tornado')
+    datatype: Decimal
+    description: Sum of tornado path lengths in miles. Each row is a county segment, so a track that crosses counties
+      is several segments; this is total path on the ground, not one track.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( SUM ( 'Fact Event'[Tornado Length Miles] ), KEEPFILTERS ( 'Event Type'[Event Type] = "Tornado"
+          ) )
+        format_string: '#,0.0'
+        display_folder: Tornado
+  - name: blank_property_cells
+    expression:
+      sql: COUNT(*) FILTER (WHERE property_damage_usd IS NULL)
+    datatype: Decimal
+    description: Event rows whose property damage cell is blank (unknown, kept out of the sums, not counted as zero).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Events], KEEPFILTERS ( ISBLANK ( 'Fact Event'[Property Damage USD] ) ) )
+        format_string: '#,0'
+        display_folder: Audit
+- name: fact_fatality
+  source: noaa_storm_events.fact_fatality
+  description: 'Fact table: NOAA Storm Events fatalities file, one row per fatality id (a person who died), from
+    the latest vintage of each data year loaded. Who died, when, where and whether the death was direct. It is not
+    a second copy of the event death counts: the two files disagree slightly (2025: 932 fatality rows, 926 deaths
+    on event rows), and the model never adds them. Filters reach the event''s state and type through the one-way
+    link to Fact Event.'
+  fields:
+  - name: fatality_id
+    expression:
+      sql: fatality_id
+    datatype: String
+    description: NOAA's fatality id. One row per id.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: event_id
+    expression:
+      sql: event_id
+    datatype: String
+    description: 'Event the death is attached to. Foreign key to ''Fact Event''[Event ID] (one way: the event''s
+      state, type and begin date filter fatalities; fatalities do not filter events).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: fatality_date
+    expression:
+      sql: fatality_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Day the person died. Foreign key to 'Fatality Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: profile_key
+    expression:
+      sql: profile_key
+    datatype: String
+    description: Fatality type, location and sex joined with "|". Foreign key to 'Fatality Profile'[Profile Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: age
+    expression:
+      sql: age
+    datatype: Integer
+    description: Age in years. Blank when not recorded.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  metrics:
+  - name: fatality_records
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: People in the fatalities file. Read apart from Deaths (the event rows' counts); never add the two.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( 'Fact Fatality' )
+        format_string: '#,0'
+        display_folder: Fatality file
+  - name: median_age_at_death
+    expression:
+      sql: MEDIAN(age)
+    datatype: Decimal
+    description: Median age of the people in the fatality records in context that have an age.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: MEDIAN ( 'Fact Fatality'[Age] )
+        format_string: '0'
+        display_folder: Fatality file
+- name: fatality_date
+  source: noaa_storm_events.fatality_date
+  description: 'Fatality calendar: the same days as Date, as a separate marked date table. Related only to ''Fact
+    Fatality''[Fatality Date], so a slicer here means the day the person died, which can differ from the day the
+    event began.'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Fatality'[Fatality Date] (the day the person died).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: fatality_profile
+  source: noaa_storm_events.fatality_profile
+  description: 'Who died and where, one row per combination present in the fatalities file: direct or indirect,
+    NOAA''s place class (vehicle, outside, permanent home and so on, never a street address) and sex. Filters Fact
+    Fatality only.'
+  primary_key:
+  - profile_key
+  fields:
+  - name: profile_key
+    expression:
+      sql: profile_key
+    datatype: String
+    description: Fatality Type, Fatality Location and Sex joined with "|". Primary key, related to 'Fact Fatality'[Profile
+      Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: fatality_type
+    expression:
+      sql: fatality_type
+    datatype: String
+    description: Direct (caused by the weather itself, for example struck by a falling tree) or Indirect (related
+      to the event, for example a car crash on an icy road).
+  - name: fatality_location
+    expression:
+      sql: fatality_location
+    datatype: String
+    description: NOAA's place class for where the person was, for example Vehicle/Towed Trailer, Outside/Open Areas,
+      Permanent Home, In Water. Unknown when NOAA left it blank or wrote Unknown.
+  - name: sex
+    expression:
+      sql: sex
+    datatype: String
+    description: Female, Male, or Not recorded (blank in the file).
+- name: state
+  source: noaa_storm_events.state
+  description: 'Where NOAA files the event: the 50 states and the District of Columbia, the territories (Puerto
+    Rico, Virgin Islands, Guam, American Samoa), and marine areas (Atlantic North and South, Gulf of Mexico, the
+    Great Lakes, Gulf of Alaska, E Pacific and others). A marine area is not part of any state. Built from the states
+    present in the loaded files.'
+  primary_key:
+  - state
+  fields:
+  - name: state
+    expression:
+      sql: state
+    datatype: String
+    description: State, territory or marine area name as NOAA publishes it (upper case), for example MISSOURI or
+      GULF OF MEXICO. Primary key, related to 'Fact Event'[State].
+  - name: state_fips
+    expression:
+      sql: state_fips
+    datatype: Integer
+    description: 'NOAA''s state code for the area: the US FIPS code for states and DC (1 to 56), and NOAA''s own
+      codes for territories (96 to 99) and marine areas (81 to 95).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: geography_kind
+    expression:
+      sql: geography_kind
+    datatype: String
+    description: State (50 states and DC), Territory (Puerto Rico, Virgin Islands, Guam, American Samoa) or Marine
+      (open water and the Great Lakes).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Geography Kind Sort
+  - name: geography_kind_sort
+    expression:
+      sql: geography_kind_sort
+    datatype: Integer
+    description: 'Sort order for Geography Kind: 1 State, 2 Territory, 3 Marine.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: tornado_scale
+  source: noaa_storm_events.tornado_scale
+  description: Tornado intensity rating (Enhanced Fujita, or Fujita for older years). Every event that is not a
+    rated tornado has the scale None. EFU means the tornado could not be rated; it is not weaker or stronger than
+    any rating.
+  primary_key:
+  - tornado_scale
+  fields:
+  - name: tornado_scale
+    expression:
+      sql: tornado_scale
+    datatype: String
+    description: EF0 to EF5, F0 to F5, EFU (unknown), or None. Primary key, related to 'Fact Event'[Tornado Scale].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Scale Sort
+  - name: scale_number
+    expression:
+      sql: scale_number
+    datatype: Integer
+    description: The scale's number, 0 to 5. Blank for EFU and None. EF2 or stronger reads this.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: scale_sort
+    expression:
+      sql: scale_sort
+    datatype: Integer
+    description: 'Sort order: the numbered ratings first, then EFU, then None.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+relationships:
+- name: fact_event_to_date_begin_date
+  from: fact_event
+  to: date
+  from_columns:
+  - begin_date
+  to_columns:
+  - date
+- name: fact_event_to_end_date
+  from: fact_event
+  to: end_date
+  from_columns:
+  - end_date
+  to_columns:
+  - date
+- name: fact_event_to_state
+  from: fact_event
+  to: state
+  from_columns:
+  - state
+  to_columns:
+  - state
+- name: fact_event_to_event_type
+  from: fact_event
+  to: event_type
+  from_columns:
+  - event_type
+  to_columns:
+  - event_type
+- name: fact_event_to_area_type
+  from: fact_event
+  to: area_type
+  from_columns:
+  - cz_type
+  to_columns:
+  - cz_type
+- name: fact_event_to_tornado_scale
+  from: fact_event
+  to: tornado_scale
+  from_columns:
+  - tornado_scale
+  to_columns:
+  - tornado_scale
+- name: fact_fatality_to_fact_event
+  from: fact_fatality
+  to: fact_event
+  from_columns:
+  - event_id
+  to_columns:
+  - event_id
+- name: fact_fatality_to_fatality_date
+  from: fact_fatality
+  to: fatality_date
+  from_columns:
+  - fatality_date
+  to_columns:
+  - date
+- name: fact_fatality_to_fatality_profile
+  from: fact_fatality
+  to: fatality_profile
+  from_columns:
+  - profile_key
+  to_columns:
+  - profile_key
+metrics:
+- name: ef2_or_stronger
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Tornadoes], KEEPFILTERS ( 'Tornado Scale'[Scale Number] >= 2 ) )
+  datatype: Decimal
+  description: 'Tornadoes rated EF2 or stronger (or F2 and up in older years). EFU, an unrated tornado, is not counted.
+    No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may only reference the aggregate''s own dataset, and the
+    fact has no copy of that column.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Tornado
+- name: average_magnitude
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( CALCULATE ( DISTINCTCOUNT ( 'Fact Event'[Event Type] ) ) = 1, AVERAGE ( 'Fact Event'[Magnitude]
+        ) )
+  datatype: Decimal
+  description: 'Mean of the magnitude column. Blank unless the events in context are all one event type, because
+    the unit depends on the type (hail in inches, wind in knots). No OSSIE_SQL_2026 expression: blank unless exactly
+    one event type is in the filters (magnitude is knots for wind and inches for hail). `AVG(magnitude)` alone would
+    mix units; the guard reads the query''s filters.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Magnitude
+- name: events_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Begin Date], TOTALYTD ( [Events], 'Date'[Date] ) )
+  datatype: Decimal
+  description: 'Events year to date by begin date: January through the selected period of the same year. Blank for
+    a period that starts after the last loaded begin date. No OSSIE_SQL_2026 expression: `TOTALYTD` shifts or accumulates
+    dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t
+    move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: property_damage_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Begin Date], TOTALYTD ( [Property damage], 'Date'[Date] ) )
+  datatype: Decimal
+  description: 'Property damage year to date by begin date. Blank for a period that starts after the last loaded
+    begin date. No OSSIE_SQL_2026 expression: `TOTALYTD` shifts or accumulates dates through the Power BI date table.
+    OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0
+      display_folder: Time
+- name: events_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last Begin Date] RETURN CALCULATE ( [Events], SAMEPERIODLASTYEAR ( FILTER ( VALUES
+        ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Events in the same period one year earlier, by begin date, over the same days that have data now
+    (a year in progress compares like with like). Shifts Date only, never End Date or Fatality Date. No OSSIE_SQL_2026
+    expression: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026
+    has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: events_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Events] ), DIVIDE ( [Events] - [Events prior year], [Events prior year] )
+        )
+  datatype: Decimal
+  description: 'Change in events against the same period a year earlier, as a percentage of the prior year. No OSSIE_SQL_2026
+    expression: Depends on `events_prior_year`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: property_damage_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last Begin Date] RETURN CALCULATE ( [Property damage], SAMEPERIODLASTYEAR ( FILTER
+        ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Property damage in the same period one year earlier, by begin date, over the same days that have
+    data now. No OSSIE_SQL_2026 expression: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI
+    date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0
+      display_folder: Time
+- name: property_damage_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Property damage] ), DIVIDE ( [Property damage] - [Property damage prior year],
+        [Property damage prior year] ) )
+  datatype: Decimal
+  description: 'Change in property damage against the same period a year earlier, as a percentage of the prior year.
+    One large event can swing it (a single 2025 Missouri tornado is 1.6 billion dollars). No OSSIE_SQL_2026 expression:
+    Depends on `property_damage_prior_year`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: last_begin_date
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( MAX ( 'Fact Event'[Begin Date] ), REMOVEFILTERS () )
+  datatype: Date
+  description: 'Latest event begin date in the model, ignoring every filter. The year-to-date and prior-year measures
+    read it. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026
+    metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Audit
+      is_hidden: true
+- name: file_vintage
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( MAX ( 'Fact Event'[File Built] ), REMOVEFILTERS () )
+  datatype: Date
+  description: 'Creation date of the newest file loaded (the c date in the file name). NOAA replaces a year''s file
+    when it revises it; one vintage per data year is loaded. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads
+    or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS,
+    ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Audit
+- name: citation
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: '"Source: NOAA National Centers for Environmental Information, Storm Events Database, bulk CSV
+        vintage c" & FORMAT ( [File vintage], "yyyymmdd" ) & ". Public domain."'
+  datatype: String
+  description: 'The source line to show on any report built from this model, with the vintage loaded. No OSSIE_SQL_2026
+    expression: a citation or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '@'
+      display_folder: About
+- name: direct_fatality_records
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Direct" ) )
+  datatype: Decimal
+  description: 'Fatality records whose type is Direct. No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may only
+    reference the aggregate''s own dataset, and the fact has no copy of that column.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Fatality file
+- name: indirect_fatality_records
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Fatality records], KEEPFILTERS ( 'Fatality Profile'[Fatality Type] = "Indirect" )
+        )
+  datatype: Decimal
+  description: 'Fatality records whose type is Indirect. No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may
+    only reference the aggregate''s own dataset, and the fact has no copy of that column.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Fatality file

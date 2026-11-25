@@ -1,0 +1,1364 @@
+# Apache Ossie Core Metadata Specification twin of models/restaurant-inspections (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: restaurant_inspections
+datasets:
+- name: critical_band
+  source: restaurant_inspections.critical_band
+  description: 'Critical violations cited at an inspection, banded: none, 1, 2, 3 or more. The band holds the findings
+    constant, so outcomes can be compared across jurisdictions at the same level of findings (the red team''s correction).'
+  primary_key:
+  - critical_band_key
+  fields:
+  - name: critical_band_key
+    expression:
+      sql: critical_band_key
+    datatype: Integer
+    description: 0, 1, 2 or 3 (3 means three or more). Primary key, related to 'Fact Inspection'[Critical Band Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: critical_band
+    expression:
+      sql: critical_band
+    datatype: String
+    description: No critical, 1 critical, 2 critical, 3+ critical. Sorted by Critical Band Key.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Critical Band Key
+- name: critical_flag
+  source: restaurant_inspections.critical_flag
+  description: Whether a violation counts as critical. Each jurisdiction's own flag where it publishes one; Delaware
+    and Montgomery publish none, so there a violation is critical when its category is an FDA risk factor (Jurisdiction[Critical
+    Means]).
+  primary_key:
+  - critical_flag
+  fields:
+  - name: critical_flag
+    expression:
+      sql: critical_flag
+    datatype: String
+    description: Critical or Not critical. Primary key, related to 'Fact Violation'[Critical Flag].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Critical Flag Sort
+  - name: critical_flag_sort
+    expression:
+      sql: critical_flag_sort
+    datatype: Integer
+    description: 'Sort order: Critical first.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: date
+  source: restaurant_inspections.date
+  description: Calendar dimension, one row per day from 1 January 2023 to 31 December 2026. Marked as the model's
+    date table. Related to 'Fact Inspection'[Inspection Date], the one date in the model (violations take their
+    inspection's date through the inspection; establishments have no date), so there is no role-playing date.
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Inspection'[Inspection Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: season
+    expression:
+      sql: season
+    datatype: String
+    description: 'Meteorological season of the northern hemisphere: Dec-Feb, Mar-May, Jun-Aug, Sep-Nov (December
+      counts with the January and February that follow it in season, not in Year). Sorted by Season Sort.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Season Sort
+  - name: season_sort
+    expression:
+      sql: season_sort
+    datatype: Integer
+    description: 'Sort key for Season: 1 Dec-Feb, 2 Mar-May, 3 Jun-Aug, 4 Sep-Nov.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: establishment
+  source: restaurant_inspections.establishment
+  description: Establishments (restaurants and other food businesses) as published by each jurisdiction, from their
+    most recent row. Nothing is matched across jurisdictions. 93 inspections (91 Montgomery, 2 Chicago) carry no
+    establishment id; they point to a placeholder row per jurisdiction, <jurisdiction>:(unknown), so no inspection
+    is lost. Two establishment rows with no id are dropped. Address fields are business data, not personal data.
+  primary_key:
+  - establishment_key
+  fields:
+  - name: establishment_key
+    expression:
+      sql: establishment_key
+    datatype: String
+    description: <jurisdiction>:<publisher id>, for example nyc:41234567 (Delaware publishes no id, so its key is
+      name|address|zip). Primary key, related to 'Fact Inspection'[Establishment Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: publisher_id
+    expression:
+      sql: publisher_id
+    datatype: String
+    description: The publisher's own establishment id (NYC CAMIS, Chicago licence number, and so on).
+  - name: jurisdiction_key
+    expression:
+      sql: jurisdiction_key
+    datatype: String
+    description: 'Jurisdiction id of the establishment (same codes as Jurisdiction[Jurisdiction Key]). Not related:
+      filter by jurisdiction through the Jurisdiction table.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: name
+    expression:
+      sql: name
+    datatype: String
+    description: Business name as published.
+  - name: name_normalized
+    expression:
+      sql: name_normalized
+    datatype: String
+    description: 'Name in upper case with punctuation, store numbers and legal suffixes removed: groups a chain''s
+      branches (every STARBUCKS).'
+  - name: address
+    expression:
+      sql: address
+    datatype: String
+    description: Street address as published.
+  - name: city
+    expression:
+      sql: city
+    datatype: String
+    description: City as published.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: City
+  - name: state
+    expression:
+      sql: state
+    datatype: String
+    description: Two-letter state or province code (ON for Toronto).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: StateOrProvince
+  - name: zip
+    expression:
+      sql: zip
+    datatype: String
+    description: ZIP or postal code as published.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: PostalCode
+  - name: latitude
+    expression:
+      sql: latitude
+    datatype: Decimal
+    description: Latitude as published, fixed decimal to four places (about 11 m); blank in King County (none published).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0.0000'
+        data_category: Latitude
+  - name: longitude
+    expression:
+      sql: longitude
+    datatype: Decimal
+    description: Longitude as published, fixed decimal to four places; blank in King County (none published).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0.0000'
+        data_category: Longitude
+  - name: facility_type
+    expression:
+      sql: facility_type
+    datatype: String
+    description: The publisher's facility class where one exists (Chicago facility type, King County classification,
+      Montgomery licence subtype, Boston description, New York State food service description).
+  - name: cuisine
+    expression:
+      sql: cuisine
+    datatype: String
+    description: Cuisine, New York City only.
+  - name: chain
+    expression:
+      sql: chain
+    datatype: String
+    description: One of the 18 national chains the findings track (Starbucks, McDonald's, Subway, Dunkin', Chipotle,
+      Burger King, 7-Eleven, Taco Bell, Wendy's, Domino's, Panera, Popeyes, Chick-fil-A, KFC, Pizza Hut, Panda Express,
+      Jersey Mike's, Tim Hortons), matched on the start of the normalized name; (not a chain) otherwise. Franchisees
+      listed under an operator's name are not caught, which biases chain comparisons toward no difference.
+  - name: is_chain
+    expression:
+      sql: is_chain
+    datatype: Boolean
+    description: True for an establishment of one of the 18 tracked chains.
+  - name: chain_or_independent
+    expression:
+      sql: chain_or_independent
+    datatype: String
+    description: Chain or Independent / other, for slicing.
+- name: fact_inspection
+  source: restaurant_inspections.fact_inspection
+  description: 'Fact table: one row per inspection across the ten jurisdictions (the data factory''s joined inspections.parquet),
+    with the counts of violations and critical violations it cited and its common burden score. Violations are a
+    second fact at a finer grain (''Fact Violation''), related to this table by Inspection Key, so inspection counts
+    never multiply by violations. Compare jurisdictions on findings (critical violations per inspection, the re-inspection
+    and closure rates at 3+ criticals), not on published outcomes: each jurisdiction''s "fail" is a different event
+    (Jurisdiction[Fail Means]). Every column is hidden; analysis goes through the measures and the dimensions.'
+  primary_key:
+  - inspection_key
+  fields:
+  - name: inspection_key
+    expression:
+      sql: inspection_key
+    datatype: String
+    description: Inspection id, <jurisdiction>:<publisher's inspection id> (or establishment and date where none
+      is published). Primary key; 'Fact Violation' relates to it.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: establishment_key
+    expression:
+      sql: establishment_key
+    datatype: String
+    description: Establishment key, foreign key to Establishment (<jurisdiction>:(unknown) for the 93 inspections
+      published without one).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: jurisdiction_key
+    expression:
+      sql: jurisdiction_key
+    datatype: String
+    description: Jurisdiction id, foreign key to Jurisdiction.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: inspection_date
+    expression:
+      sql: inspection_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Inspection date (no time of day), foreign key to Date.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: inspection_type_key
+    expression:
+      sql: inspection_type_key
+    datatype: String
+    description: Normalized inspection type, foreign key to Inspection Type.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: outcome_key
+    expression:
+      sql: outcome_key
+    datatype: String
+    description: Jurisdiction, published result and tier, foreign key to Outcome.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: critical_band_key
+    expression:
+      sql: critical_band_key
+    datatype: Integer
+    description: Critical violations cited, capped at 3 (3 means three or more), foreign key to Critical Band.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: visit_kind_key
+    expression:
+      sql: visit_kind_key
+    datatype: Integer
+    description: 1 first visit, 2 within 60 days of an earlier visit to the same establishment; foreign key to Visit
+      Kind.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: days_since_previous_visit
+    expression:
+      sql: days_since_previous_visit
+    datatype: Integer
+    description: Days since the establishment's previous visit on an earlier date (any type); blank for its first
+      visit in the data.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: violation_count
+    expression:
+      sql: violation_count
+    datatype: Integer
+    description: Violations cited at this inspection (0 for Austin, which publishes none).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: critical_count
+    expression:
+      sql: critical_count
+    datatype: Integer
+    description: Critical violations cited at this inspection.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: burden_score
+    expression:
+      sql: burden_score
+    datatype: Decimal
+    description: 'Common burden score 0 to 100 (Austin: its native 100-point score).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.0'
+  - name: native_score
+    expression:
+      sql: native_score
+    datatype: Decimal
+    description: The publisher's own score, unchanged (NYC points, Austin score, King County points).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: native_grade
+    expression:
+      sql: native_grade
+    datatype: String
+    description: The publisher's own grade, unchanged (NYC letter grade).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  metrics:
+  - name: inspections
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: Inspections in context, every jurisdiction and type. Austin's count includes score-only inspections
+      with no violation data.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( 'Fact Inspection' )
+        format_string: '#,0'
+        display_folder: Inspections
+  - name: establishments_inspected
+    expression:
+      sql: COUNT(DISTINCT establishment_key)
+    datatype: Integer
+    description: Distinct establishments with an inspection in context.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DISTINCTCOUNT ( 'Fact Inspection'[Establishment Key] )
+        format_string: '#,0'
+        display_folder: Inspections
+  - name: inspections_per_establishment
+    expression:
+      sql: COUNT(*) / NULLIF(COUNT(DISTINCT establishment_key), 0)
+    datatype: Decimal
+    description: Inspections per establishment inspected in context.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Inspections], [Establishments inspected] )
+        format_string: '0.00'
+        display_folder: Inspections
+  - name: follow_up_share
+    expression:
+      sql: COALESCE(COUNT(*) FILTER (WHERE visit_kind_key = 2), 0) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Share of inspections in context that came within 60 days of an earlier visit to the same establishment
+      (Visit Kind). High in Boston, whose follow-ups are published as routine visits.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( COALESCE ( CALCULATE ( [Inspections], KEEPFILTERS ( 'Visit Kind'[Visit Kind Key] = 2 ) ),
+          0 ), [Inspections] )
+        format_string: 0.0%
+        display_folder: Inspections
+  - name: average_burden_score
+    expression:
+      sql: AVG(burden_score)
+    datatype: Decimal
+    description: 'Mean common burden score, 0 to 100: 100 minus 7 per critical and 2 per non-critical violation,
+      floored at 0 (Austin: its own 100-point score). A burden index, not a measured risk: what counts as critical,
+      and how many rows one problem becomes, differ by jurisdiction. 100 means nothing was cited, not that the place
+      is safe.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: AVERAGE ( 'Fact Inspection'[Burden Score] )
+        format_string: '0.0'
+        display_folder: Findings
+- name: fact_violation
+  source: restaurant_inspections.fact_violation
+  description: 'Fact table: one row per violation cited (the data factory''s joined violations.parquet), each mapped
+    to one of 15 common categories and flagged critical by its jurisdiction''s own definition. Related many-to-one
+    to ''Fact Inspection'' by Inspection Key, so date, establishment, jurisdiction and inspection-type filters reach
+    violations through their inspection; category and critical filters stay on violations. Per-inspection measures
+    divide by ''Fact Inspection'' rows, never by violation rows. Austin publishes no violations. Every column is
+    hidden.'
+  fields:
+  - name: inspection_key
+    expression:
+      sql: inspection_key
+    datatype: String
+    description: Inspection id, foreign key to 'Fact Inspection'.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: category_key
+    expression:
+      sql: category_key
+    datatype: String
+    description: Common category code, foreign key to Violation Category.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: critical_flag
+    expression:
+      sql: critical_flag
+    datatype: String
+    description: Critical or Not critical, foreign key to Critical Flag.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: critical_basis
+    expression:
+      sql: critical_basis
+    datatype: String
+    description: published when the jurisdiction flags it, derived_from_category in Delaware and Montgomery.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: violation_code_key
+    expression:
+      sql: violation_code_key
+    datatype: String
+    description: Jurisdiction and code, foreign key to Violation Code.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: points
+    expression:
+      sql: points
+    datatype: Decimal
+    description: Points deducted, where published (King County).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  metrics:
+  - name: violations
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: Violation rows in context. Recording habits differ (NYC cites a code once per inspection; King
+      County and Toronto can cite one problem as several rows), so compare jurisdictions per inspection, not on
+      totals.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( 'Fact Violation' )
+        format_string: '#,0'
+        display_folder: Findings
+  - name: critical_violations
+    expression:
+      sql: COUNT(*) FILTER (WHERE critical_flag = 'Critical')
+    datatype: Decimal
+    description: 'Critical violations in context, each jurisdiction''s own critical flag (derived from the category
+      in Delaware and Montgomery). Respects a Critical Flag filter: with Not critical picked it is blank.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Violations], KEEPFILTERS ( 'Critical Flag'[Critical Flag] = "Critical" ) )
+        format_string: '#,0'
+        display_folder: Findings
+  - name: critical_share_of_violations
+    expression:
+      sql: COUNT(*) FILTER (WHERE critical_flag = 'Critical') / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Critical violations as a share of all violations in context.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Critical violations], [Violations] )
+        format_string: 0.0%
+        display_folder: Findings
+  - name: inspections_citing
+    expression:
+      sql: COUNT(DISTINCT inspection_key)
+    datatype: Integer
+    description: 'Inspections that cited at least one violation in context: pick a Violation Category to count inspections
+      citing it. Counted once per inspection, however many rows it cited.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DISTINCTCOUNT ( 'Fact Violation'[Inspection Key] )
+        format_string: '#,0'
+        display_folder: Findings
+- name: inspection_type
+  source: restaurant_inspections.inspection_type
+  description: 'The data factory''s normalized inspection type. The cross-jurisdiction findings use Routine only.
+    Boston and Toronto publish no type, so all their visits read Routine, follow-ups included: use Visit Kind to
+    separate first visits from follow-ups.'
+  primary_key:
+  - inspection_type_key
+  fields:
+  - name: inspection_type_key
+    expression:
+      sql: inspection_type_key
+    datatype: String
+    description: 'Normalized type code: routine, reinspection, complaint, pre_opening, other. Primary key, related
+      to ''Fact Inspection''[Inspection Type Key].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: inspection_type
+    expression:
+      sql: inspection_type
+    datatype: String
+    description: 'Inspection type: Routine, Re-inspection, Complaint, Pre-opening, Other. Sorted by Inspection Type
+      Sort.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Inspection Type Sort
+  - name: inspection_type_sort
+    expression:
+      sql: inspection_type_sort
+    datatype: Integer
+    description: Sort order of Inspection Type.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: jurisdiction
+  source: restaurant_inspections.jurisdiction
+  description: 'The ten jurisdictions joined, each with its rulebook: how it scores, what its own worst verdict
+    ("fail") means, and what it calls a critical violation. Read these before comparing any published outcome across
+    jurisdictions: a Boston fail, a King County Unsatisfactory and a Toronto closure are different events, and Toronto''s
+    critical (crucial plus significant) is wider than NYC''s. Static table written from the data factory''s SOURCES.md
+    and schema.md (24 Nov 2026).'
+  primary_key:
+  - jurisdiction_key
+  fields:
+  - name: jurisdiction_key
+    expression:
+      sql: jurisdiction_key
+    datatype: String
+    description: Source id used throughout the data factory (nyc, chicago, king_county, austin, montgomery, delaware,
+      marin, ny_state, boston, toronto). Primary key, related to 'Fact Inspection'[Jurisdiction Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: jurisdiction
+    expression:
+      sql: jurisdiction
+    datatype: String
+    description: Jurisdiction name, for example New York City or King County, WA (Seattle).
+  - name: country
+    expression:
+      sql: country
+    datatype: String
+    description: 'Country: United States or Canada (Toronto, the outside comparator).'
+  - name: publisher
+    expression:
+      sql: publisher
+    datatype: String
+    description: The inspecting agency and dataset.
+  - name: scoring_system
+    expression:
+      sql: scoring_system
+    datatype: String
+    description: 'The jurisdiction''s own scoring system: points and letter grades, pass/fail verdicts, placards,
+      a 100-point score, or none.'
+  - name: fail_means
+    expression:
+      sql: fail_means
+    datatype: String
+    description: What the jurisdiction's own worst verdict means, the event mapped to outcome tier 3. In Boston,
+      King County and Chicago it is a fail with a re-inspection ordered; in Toronto and Marin it is a closure; NYC
+      publishes no fail (tier 3 is a C grade, a closure, or an ungraded initial inspection over 27 points).
+  - name: critical_means
+    expression:
+      sql: critical_means
+    datatype: String
+    description: What counts as a critical violation here, published by the jurisdiction or derived from the category
+      where none is published.
+  - name: publishes_violations
+    expression:
+      sql: publishes_violations
+    datatype: Boolean
+    description: True when the jurisdiction publishes individual violations. Austin publishes a score only, so it
+      is left out of every per-inspection violation measure.
+  - name: publishes_verdict
+    expression:
+      sql: publishes_verdict
+    datatype: Boolean
+    description: True when the jurisdiction publishes a verdict that maps to an outcome tier. Delaware and New York
+      State publish none, so they have no published outcome.
+  - name: data_from
+    expression:
+      sql: data_from
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First month the data factory holds for this jurisdiction (several portals keep a rolling window),
+      so a year-on-year comparison before it is partial.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: licence
+    expression:
+      sql: licence
+    datatype: String
+    description: Licence of the published dataset, as verified on 24 Nov 2026.
+- name: outcome
+  source: restaurant_inspections.outcome
+  description: 'Each jurisdiction''s published verdict, mapped to the data factory''s common outcome tier (1 passed,
+    2 passed with conditions or critical findings, 3 failed, closed or C grade) and flagged when it closed the establishment.
+    The tier records each jurisdiction''s own judgment, so it measures the rulebook as much as the kitchens: never
+    compare tiers across jurisdictions without holding the findings constant (Critical Band). One row per jurisdiction,
+    published result and tier.'
+  primary_key:
+  - outcome_key
+  fields:
+  - name: outcome_key
+    expression:
+      sql: outcome_key
+    datatype: String
+    description: Jurisdiction, published result and tier joined with |. Primary key, related to 'Fact Inspection'[Outcome
+      Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: published_result
+    expression:
+      sql: published_result
+    datatype: String
+    description: The jurisdiction's verdict text as published (NYC action, Chicago results, Boston HE_ code, Toronto
+      status, Marin result code), or (none published) for Delaware and New York State.
+  - name: tier
+    expression:
+      sql: tier
+    datatype: Integer
+    description: Common outcome tier, 1 to 3; blank when the jurisdiction publishes no verdict or the visit had
+      none (no entry, out of business, educational visit).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: tier_name
+    expression:
+      sql: tier_name
+    datatype: String
+    description: 'Tier label: 1 Passed; 2 Passed with conditions or critical findings; 3 Failed, closed or C grade;
+      Not rated. Sorted by Tier Sort.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Tier Sort
+  - name: tier_sort
+    expression:
+      sql: tier_sort
+    datatype: Integer
+    description: Sort order of Tier Name (Not rated last).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: closed
+    expression:
+      sql: closed
+    datatype: Boolean
+    description: 'True when the verdict closed the establishment: NYC closed or re-closed by DOHMH, Boston HE_Closure,
+      HE_VolClos (voluntary closure) and HE_TSOP (permit suspended), Toronto and Montgomery Closed, Marin''s red
+      placard. A closure is the one outcome that means the same thing everywhere.'
+- name: violation_category
+  source: restaurant_inspections.violation_category
+  description: The data factory's 15 common violation categories (CROSSWALK.md), onto which every jurisdiction's
+    codes are mapped. A zero for a category in a jurisdiction can mean its form has no item for it (Montgomery's
+    16-item form has no cleaning item; NYC and New York State have no garbage item), not that the problem never
+    happens.
+  primary_key:
+  - category_key
+  fields:
+  - name: category_key
+    expression:
+      sql: category_key
+    datatype: String
+    description: Category code, for example temperature_control. Primary key, related to 'Fact Violation'[Category
+      Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: category
+    expression:
+      sql: category
+    datatype: String
+    description: Category name, for example Temperature control. Sorted by Category Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Category Sort
+  - name: covers
+    expression:
+      sql: covers
+    datatype: String
+    description: What the category covers.
+  - name: fda_risk_factor
+    expression:
+      sql: fda_risk_factor
+    datatype: Boolean
+    description: True when the category is an FDA foodborne-illness risk factor; Delaware's and Montgomery's critical
+      flag is derived from it.
+  - name: category_sort
+    expression:
+      sql: category_sort
+    datatype: Integer
+    description: Sort order (risk factors first, then upkeep, then paperwork, then other).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: violation_code
+  source: restaurant_inspections.violation_code
+  description: Each jurisdiction's own violation codes (NYC 02G, Chicago item numbers, King County 2120, FDA Food
+    Code sections, California code sections, Toronto bylaw sections, Montgomery's compliance columns) with one description
+    each. One row per jurisdiction and code.
+  primary_key:
+  - violation_code_key
+  fields:
+  - name: violation_code_key
+    expression:
+      sql: violation_code_key
+    datatype: String
+    description: Jurisdiction and code joined with |. Primary key, related to 'Fact Violation'[Violation Code Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: code_jurisdiction
+    expression:
+      sql: code_jurisdiction
+    datatype: String
+    description: Jurisdiction id of the code. Codes are never shared across jurisdictions.
+  - name: code
+    expression:
+      sql: code
+    datatype: String
+    description: The publisher's code; (no code) for the Toronto infractions published without one.
+  - name: code_description
+    expression:
+      sql: code_description
+    datatype: String
+    description: The first description published for the code, cut at 300 characters (Marin's are free-text inspector
+      notes, so its first note stands for the code).
+- name: visit_kind
+  source: restaurant_inspections.visit_kind
+  description: 'First visit or follow-up: a follow-up is an inspection within 60 days of an earlier visit (of any
+    type, on an earlier date) to the same establishment. Boston and Toronto publish no inspection type, so their
+    follow-ups sit inside Routine; filter to First visit to compare like with like (Boston''s published fail rate
+    is 40% on all routine visits and 61% on first visits).'
+  primary_key:
+  - visit_kind_key
+  fields:
+  - name: visit_kind_key
+    expression:
+      sql: visit_kind_key
+    datatype: Integer
+    description: 1 first visit, 2 follow-up within 60 days. Primary key, related to 'Fact Inspection'[Visit Kind
+      Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: visit_kind
+    expression:
+      sql: visit_kind
+    datatype: String
+    description: First visit, or Follow-up within 60 days. Sorted by Visit Kind Key.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Visit Kind Key
+relationships:
+- name: fact_inspection_to_date
+  from: fact_inspection
+  to: date
+  from_columns:
+  - inspection_date
+  to_columns:
+  - date
+- name: fact_inspection_to_establishment
+  from: fact_inspection
+  to: establishment
+  from_columns:
+  - establishment_key
+  to_columns:
+  - establishment_key
+- name: fact_inspection_to_jurisdiction
+  from: fact_inspection
+  to: jurisdiction
+  from_columns:
+  - jurisdiction_key
+  to_columns:
+  - jurisdiction_key
+- name: fact_inspection_to_outcome
+  from: fact_inspection
+  to: outcome
+  from_columns:
+  - outcome_key
+  to_columns:
+  - outcome_key
+- name: fact_inspection_to_inspection_type
+  from: fact_inspection
+  to: inspection_type
+  from_columns:
+  - inspection_type_key
+  to_columns:
+  - inspection_type_key
+- name: fact_inspection_to_critical_band
+  from: fact_inspection
+  to: critical_band
+  from_columns:
+  - critical_band_key
+  to_columns:
+  - critical_band_key
+- name: fact_inspection_to_visit_kind
+  from: fact_inspection
+  to: visit_kind
+  from_columns:
+  - visit_kind_key
+  to_columns:
+  - visit_kind_key
+- name: fact_violation_to_fact_inspection
+  from: fact_violation
+  to: fact_inspection
+  from_columns:
+  - inspection_key
+  to_columns:
+  - inspection_key
+- name: fact_violation_to_violation_category
+  from: fact_violation
+  to: violation_category
+  from_columns:
+  - category_key
+  to_columns:
+  - category_key
+- name: fact_violation_to_critical_flag
+  from: fact_violation
+  to: critical_flag
+  from_columns:
+  - critical_flag
+  to_columns:
+  - critical_flag
+- name: fact_violation_to_violation_code
+  from: fact_violation
+  to: violation_code
+  from_columns:
+  - violation_code_key
+  to_columns:
+  - violation_code_key
+metrics:
+- name: inspections_with_violation_data
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Inspections], KEEPFILTERS ( Jurisdiction[Publishes Violations] = TRUE () ) )
+  datatype: Decimal
+  description: 'Inspections in jurisdictions that publish violations (all but Austin): the denominator of every
+    per-inspection violation measure, so Austin''s score-only inspections never dilute a rate. No OSSIE_SQL_2026
+    expression: `FILTER (WHERE ...)` may only reference the aggregate''s own dataset, and the fact has no copy of
+    that column.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Inspections
+- name: share_with_no_violation
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Fact Inspection'[Violation
+        Count] = 0 ) ), 0 ), [Inspections with violation data] )
+  datatype: Decimal
+  description: 'Share of inspections with violation data that cited no violation at all. Recording habits differ:
+    a jurisdiction that lists only failing visits'' violations (Boston) looks cleaner or dirtier for reasons of
+    publishing, not kitchens. No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which
+    doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Findings
+- name: inspections_with_3_plus_criticals
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Inspections with violation data], KEEPFILTERS ( 'Critical Band'[Critical Band Key]
+        = 3 ) )
+  datatype: Decimal
+  description: 'Inspections with violation data that cited three or more critical violations (each jurisdiction''s
+    own critical flag). No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which doesn''t
+    port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Findings
+- name: share_with_3_plus_criticals
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( [Inspections with 3+ criticals], 0 ), [Inspections with violation data] )
+  datatype: Decimal
+  description: 'Share of inspections with violation data that cited three or more critical violations. No OSSIE_SQL_2026
+    expression: Depends on `inspections_with_3_plus_criticals`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Findings
+- name: inspections_with_a_verdict
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Inspections], KEEPFILTERS ( NOT ISBLANK ( Outcome[Tier] ) ) )
+  datatype: Decimal
+  description: 'Inspections with a published verdict mapped to a tier (blank tier excluded: Delaware and New York
+    State publish no verdict; no-entry, out-of-business and educational visits have none). No OSSIE_SQL_2026 expression:
+    `FILTER (WHERE ...)` may only reference the aggregate''s own dataset, and the fact has no copy of that column.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Outcomes
+- name: re_inspection_rate_at_3_plus_criticals
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR AtThree = CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( 'Critical Band'[Critical
+        Band Key] = 3 ) ) VAR Acted = CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( 'Critical Band'[Critical
+        Band Key] = 3 ), KEEPFILTERS ( Outcome[Tier] >= 2 ) ) RETURN DIVIDE ( COALESCE ( Acted, 0 ), AtThree )
+  datatype: Decimal
+  description: 'Comparable across jurisdictions. Of rated inspections that cited three or more critical violations,
+    the share whose verdict ordered a re-inspection or worse (tier 2 or 3: conditional pass, fail, B or C grade,
+    closure). Holds the findings constant, so it compares how jurisdictions act on the same findings. Toronto''s
+    critical includes Significant items, which is most of its lower rate. No OSSIE_SQL_2026 expression: Depends
+    on `inspections_with_a_verdict`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Outcomes
+- name: closures
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Inspections], KEEPFILTERS ( Outcome[Closed] = TRUE () ) )
+  datatype: Decimal
+  description: 'Closures (Outcome[Closed]) in context. No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may only
+    reference the aggregate''s own dataset, and the fact has no copy of that column.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Outcomes
+- name: closure_rate
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( [Closures], 0 ), [Inspections with a verdict] )
+  datatype: Decimal
+  description: 'Closures as a share of rated inspections. A closure is the one verdict that means the same everywhere,
+    but the findings behind it still differ: read it at a fixed Critical Band, or use Closure rate at 3+ criticals.
+    No OSSIE_SQL_2026 expression: Depends on `closures`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Outcomes
+- name: closure_rate_at_3_plus_criticals
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( CALCULATE ( [Closures], KEEPFILTERS ( 'Critical Band'[Critical Band Key] =
+        3 ) ), 0 ), CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( 'Critical Band'[Critical Band Key] =
+        3 ) ) )
+  datatype: Decimal
+  description: 'Comparable across jurisdictions. Of rated inspections that cited three or more critical violations,
+    the share that closed the establishment. No OSSIE_SQL_2026 expression: Depends on `closures`, which doesn''t
+    port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Outcomes
+- name: published_outcome
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( CALCULATE ( [Inspections with a verdict], KEEPFILTERS ( Outcome[Tier] = 3
+        ) ), 0 ), [Inspections with a verdict] )
+  datatype: Decimal
+  description: 'NOT COMPARABLE ACROSS JURISDICTIONS. The share of rated inspections whose published verdict is the
+    jurisdiction''s worst (tier 3: Boston and Chicago fail, King County Unsatisfactory, Toronto and Marin closure,
+    NYC C grade or closure). Each jurisdiction''s tier 3 is a different event with a different trigger (Jurisdiction[Fail
+    Means]), so Boston''s 40% and Toronto''s 0.1% compare rulebooks, not kitchens. Use it within one jurisdiction
+    over time; across jurisdictions use Critical violations per inspection and the rates at 3+ criticals. No OSSIE_SQL_2026
+    expression: Depends on `inspections_with_a_verdict`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Outcomes
+- name: last_inspection_date
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( MAX ( 'Fact Inspection'[Inspection Date] ), REMOVEFILTERS () )
+  datatype: Date
+  description: 'Latest inspection date in the model, ignoring every filter (Delaware publishes two inspections dated
+    4 December 2026). The prior-year measures read it. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads or removes
+    what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED
+    or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Time
+      is_hidden: true
+- name: inspections_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last inspection date] RETURN CALCULATE ( [Inspections], SAMEPERIODLASTYEAR ( FILTER
+        ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Inspections in the same period one year earlier, over the days up to the last inspection date. Jurisdictions
+    start on different dates (Jurisdiction[Data From]): Austin and Toronto from November 2023, Montgomery from June
+    2024, Delaware from November 2024, so their prior years before those dates are partial or empty. No OSSIE_SQL_2026
+    expression: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026
+    has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: inspections_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Inspections] ), DIVIDE ( [Inspections] - [Inspections prior year], [Inspections
+        prior year] ) )
+  datatype: Decimal
+  description: 'Change in inspections against the same period a year earlier, as a percentage of the prior year.
+    No OSSIE_SQL_2026 expression: Depends on `inspections_prior_year`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: violations_per_inspection
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( [Violations], 0 ), [Inspections with violation data] )
+  datatype: Decimal
+  description: 'Violations per inspection with violation data (Austin left out). With a category picked, that category''s
+    violations per inspection. No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which
+    doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Findings
+- name: critical_violations_per_inspection
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( [Critical violations], 0 ), [Inspections with violation data] )
+  datatype: Decimal
+  description: 'The headline comparable measure: critical violations per inspection with violation data (Austin
+    left out). Compares what inspectors found, not how each jurisdiction judged it. Still read with Jurisdiction[Critical
+    Means]: Toronto''s and Boston''s critical are wider than NYC''s, so NYC''s 1.87 is, if anything, an undercount
+    next to them. No OSSIE_SQL_2026 expression: Depends on `inspections_with_violation_data`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Findings
+- name: share_of_inspections_citing
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( COALESCE ( [Inspections citing], 0 ), [Inspections with violation data] )
+  datatype: Decimal
+  description: 'Share of inspections with violation data that cited at least one violation in context (with a category
+    picked: the share citing that category, for example pests at 31.8% of NYC routine inspections). No OSSIE_SQL_2026
+    expression: Depends on `inspections_with_violation_data`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Findings
+- name: chain_critical_per_inspection
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Critical violations per inspection], KEEPFILTERS ( Establishment[Is Chain] = TRUE
+        () ) )
+  datatype: Decimal
+  description: 'Critical violations per inspection at establishments of the 18 tracked chains. No OSSIE_SQL_2026
+    expression: Depends on `critical_violations_per_inspection`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Chains
+- name: independent_critical_per_inspection
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Critical violations per inspection], KEEPFILTERS ( Establishment[Is Chain] = FALSE
+        () ) )
+  datatype: Decimal
+  description: 'Critical violations per inspection at every other establishment. No OSSIE_SQL_2026 expression: Depends
+    on `critical_violations_per_inspection`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Chains
+- name: chain_ratio
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( HASONEVALUE ( Jurisdiction[Jurisdiction Key] ), DIVIDE ( [Chain critical per inspection],
+        [Independent critical per inspection] ) )
+  datatype: Decimal
+  description: 'Chain critical per inspection divided by everyone else''s, within one jurisdiction (under 1: chains
+    are cited less). Blank unless exactly one jurisdiction is in context, because pooling mixes jurisdictions with
+    different critical definitions and chain shares. No OSSIE_SQL_2026 expression: `HASONEVALUE` reads or removes
+    what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED
+    or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Chains
+- name: critical_per_inspection_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last inspection date] RETURN CALCULATE ( [Critical violations per inspection],
+        SAMEPERIODLASTYEAR ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Critical violations per inspection in the same period one year earlier, over the days up to the
+    last inspection date. Partial where a jurisdiction''s data starts later (Jurisdiction[Data From]). No OSSIE_SQL_2026
+    expression: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026
+    has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Time
+- name: critical_per_inspection_change
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Critical per inspection prior year] ), [Critical violations per inspection]
+        - [Critical per inspection prior year] )
+  datatype: Decimal
+  description: 'Change in critical violations per inspection against the same period a year earlier, in violations
+    per inspection (a difference, not a percentage). No OSSIE_SQL_2026 expression: Depends on `critical_per_inspection_prior_year`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.00;-0.00;0.00
+      display_folder: Time
+- name: attribution
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: '"Joined from ten open restaurant-inspection datasets (NYC DOHMH, Chicago CDPH, Public Health
+        - Seattle & King County, Austin Public Health, Montgomery County MD HHS, Delaware Division of Public Health,
+        Marin County EHS, NYSDOH, Boston ISD, Toronto Public Health DineSafe). Contains information licensed under
+        the Open Government Licence - Toronto. Marin County data: Open Database License (ODbL), County of Marin."'
+  datatype: String
+  description: 'Attribution owed when anything built on the model is published. No OSSIE_SQL_2026 expression: a
+    citation or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '@'
+      display_folder: About

@@ -1,0 +1,623 @@
+# Apache Ossie Core Metadata Specification twin of models/eia-electricity (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: eia_electricity
+description: 'US retail electricity sales from EIA Form EIA-861M, sheet Monthly-States. Grain is state (50 states
+  and DC) by month by sector. EIA''s Total column is not loaded. Revenue is stored in dollars (EIA publishes thousand
+  dollars). Sales are stored in kilowatthours (EIA publishes megawatthours).
+
+  '
+ai_context:
+  instructions: 'Price is revenue divided by sales, recomputed from the sums. Do not average a price column. Customer
+    count is a monthly snapshot: do not sum it across months. The portable sql metrics have no Power BI filter context.
+    Year-to-date, year-ago, share-of and semi-additive metrics are carried only as opaque DAX.
+
+    '
+datasets:
+- name: date
+  source: eia_electricity.date
+  description: Calendar dimension, one row per day from CalendarStart (1 January 2010) to CalendarEnd (31 December
+    of the current year). Marked as the model's date table; drives year-to-date and prior-year measures. EIA data
+    is monthly, so facts land on the first day of each month.
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Retail Sales'[Date] (the first of each month).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month, the date EIA's monthly figures are keyed to.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: fact_retail_sales
+  source: eia_electricity.fact_retail_sales
+  description: 'Fact table: electricity retail sales by utilities to end-use customers, from EIA Form EIA-861M (sheet
+    Monthly-States of sales_revenue.xlsx). Grain: state (50 states and DC) x month x sector, four sectors; EIA''s
+    Total column is not loaded. Every column is hidden; analysis goes through the measures below and the Date, State
+    and Sector dimensions.'
+  primary_key:
+  - date
+  - state_code
+  - sector
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the figures are for. Foreign key to 'Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: state_code
+    expression:
+      sql: state_code
+    datatype: String
+    description: Two-letter state code (50 states and DC). Foreign key to State[State Code].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: sector
+    expression:
+      sql: sector
+    datatype: String
+    description: 'End-use sector: Residential, Commercial, Industrial or Transportation. Foreign key to Sector[Sector].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: data_status
+    expression:
+      sql: data_status
+    datatype: String
+    description: 'EIA''s status for the row: Final, or Preliminary for recent months that are revised once the annual
+      survey closes. Read through the Preliminary months measure.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: revenue_amount_usd
+    expression:
+      sql: revenue_amount_usd
+    datatype: Decimal
+    description: Retail revenue in dollars (EIA's thousand dollars x 1,000).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0;(\$#,0);\$#,0
+  - name: sales_amount_kwh
+    expression:
+      sql: sales_amount_kwh
+    datatype: Decimal
+    description: Retail sales in kilowatthours (EIA's megawatthours x 1,000).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0'
+  - name: customer_count
+    expression:
+      sql: customer_count
+    datatype: Integer
+    description: 'Customer accounts billed in the month. A monthly snapshot: never sum across months (the Customers
+      measure takes the last month).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0'
+  metrics:
+  - name: revenue
+    expression:
+      sql: SUM(revenue_amount_usd)
+    datatype: Decimal
+    description: Dollars utilities billed retail customers for electricity (EIA publishes thousand dollars; the
+      model stores dollars).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Retail Sales'[Revenue Amount USD] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Sales
+  - name: sales_kwh
+    expression:
+      sql: SUM(sales_amount_kwh)
+    datatype: Decimal
+    description: Kilowatthours of electricity sold to retail customers (EIA publishes megawatthours; the model stores
+      kWh).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Retail Sales'[Sales Amount kWh] )
+        format_string: '#,0'
+        display_folder: Sales
+  - name: sales_mwh
+    expression:
+      sql: SUM(sales_amount_kwh) / 1000
+    datatype: Decimal
+    description: Retail sales in megawatthours, the unit EIA publishes. Same quantity as Sales kWh.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Sales kWh], 1000 )
+        format_string: '#,0.0'
+        display_folder: Sales
+  - name: price_cents_per_kwh
+    expression:
+      sql: (SUM(revenue_amount_usd) / NULLIF(SUM(sales_amount_kwh), 0)) * 100
+    datatype: Decimal
+    description: 'Average retail price in cents per kilowatthour: revenue divided by sales, recomputed from the
+      sums (EIA''s published price column is the same ratio per row, so averaging it would be wrong).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Revenue], [Sales kWh] ) * 100
+        format_string: '0.00'
+        display_folder: Price
+  - name: months_in_scope
+    expression:
+      sql: COUNT(DISTINCT date)
+    datatype: Integer
+    description: 'Number of distinct months with data in the current filter context. A completeness check: a full
+      year has 12.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DISTINCTCOUNT ( 'Fact Retail Sales'[Date] )
+        format_string: '0'
+        display_folder: Audit
+  - name: preliminary_months
+    expression:
+      sql: COUNT(DISTINCT date) FILTER (WHERE data_status = 'Preliminary')
+    datatype: Decimal
+    description: Months in the current filter context that EIA still marks Preliminary (estimates revised when the
+      annual EIA-861 survey is final).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( DISTINCTCOUNT ( 'Fact Retail Sales'[Date] ), KEEPFILTERS ( 'Fact Retail Sales'[Data Status]
+          = "Preliminary" ) )
+        format_string: '0'
+        display_folder: Audit
+- name: sector
+  source: eia_electricity.sector
+  description: 'End-use sector the utility sold to, as EIA reports it on Form EIA-861M: Residential, Commercial,
+    Industrial, Transportation. EIA''s Total column is the sum of these four and is not loaded.'
+  primary_key:
+  - sector
+  fields:
+  - name: sector
+    expression:
+      sql: sector
+    datatype: String
+    description: Sector name. Primary key, related to 'Fact Retail Sales'[Sector]. Sorted Residential, Commercial,
+      Industrial, Transportation.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Sector Sort
+  - name: sector_sort
+    expression:
+      sql: sector_sort
+    datatype: Integer
+    description: 'Sort order for Sector, in EIA''s column order: 1 Residential, 2 Commercial, 3 Industrial, 4 Transportation.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: state
+  source: eia_electricity.state
+  description: The 50 US states and the District of Columbia, with US Census Bureau regions and divisions. A static
+    list entered in the model (not from EIA). DC is South / South Atlantic.
+  primary_key:
+  - state_code
+  fields:
+  - name: state_code
+    expression:
+      sql: state_code
+    datatype: String
+    description: Two-letter USPS state code, as EIA publishes it (for example CA). Primary key, related to 'Fact
+      Retail Sales'[State Code].
+  - name: state_name
+    expression:
+      sql: state_name
+    datatype: String
+    description: State name, for example California; District of Columbia for DC.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: StateOrProvince
+  - name: census_region
+    expression:
+      sql: census_region
+    datatype: String
+    description: 'US Census Bureau region: Northeast, Midwest, South or West.'
+  - name: census_division
+    expression:
+      sql: census_division
+    datatype: String
+    description: US Census Bureau division within the region, for example Pacific or South Atlantic.
+relationships:
+- name: fact_retail_sales_to_date
+  from: fact_retail_sales
+  to: date
+  from_columns:
+  - date
+  to_columns:
+  - date
+- name: fact_retail_sales_to_state
+  from: fact_retail_sales
+  to: state
+  from_columns:
+  - state_code
+  to_columns:
+  - state_code
+- name: fact_retail_sales_to_sector
+  from: fact_retail_sales
+  to: sector
+  from_columns:
+  - sector
+  to_columns:
+  - sector
+metrics:
+- name: customers
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastMonth = MAX ( 'Fact Retail Sales'[Date] ) RETURN CALCULATE ( SUM ( 'Fact Retail Sales'[Customer
+        Count] ), 'Date'[Date] = LastMonth )
+  datatype: Decimal
+  description: 'Customer accounts (meters billed) in the last month of the current filter context. Semi-additive:
+    it adds across states and sectors but never across months, because the same account repeats every month. No
+    OSSIE_SQL_2026 expression: a monthly snapshot of accounts. It adds across states and sectors and keeps only
+    the last month in the filters; `SUM(customer_count)` would count the same account every month.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Sales
+- name: average_customers
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: AVERAGEX ( VALUES ( 'Fact Retail Sales'[Date] ), CALCULATE ( SUM ( 'Fact Retail Sales'[Customer
+        Count] ) ) )
+  datatype: Decimal
+  description: 'Customer accounts averaged over the months with data in the filter context: each month''s accounts
+    (added across states and sectors) averaged across months. Equals Customers for one month. The denominator of
+    the per-customer measures, so a year divides by its average customer base, not December''s. No OSSIE_SQL_2026
+    expression: sum within each month, then average across months. Two-level aggregation, not one aggregate over
+    the row grain.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Sales
+- name: revenue_per_customer
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Revenue], [Average customers] )
+  datatype: Decimal
+  description: 'Revenue per customer account: revenue in the filter context divided by Average customers. For one
+    month it is the average monthly bill; for a whole year, the average annual bill; for a year in progress, the
+    bill so far (Months in scope says how many months). No OSSIE_SQL_2026 expression: Depends on `average_customers`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0.00;($#,0.00);$#,0.00
+      display_folder: Price
+- name: sales_per_customer_kwh
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Sales kWh], [Average customers] )
+  datatype: Decimal
+  description: 'Kilowatthours sold per customer account: sales in the filter context divided by Average customers.
+    For one month it is average monthly use; for a whole year, annual use; for a year in progress, use so far (Months
+    in scope says how many months). No OSSIE_SQL_2026 expression: Depends on `average_customers`, which doesn''t
+    port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0.0'
+      display_folder: Price
+- name: share_of_us_sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Sales kWh], CALCULATE ( [Sales kWh], ALL ( State ) ) )
+  datatype: Decimal
+  description: 'Share of US retail sales (50 states and DC) in the current sector and period that the selected states
+    account for. Sector and date filters stay; state filters are removed for the denominator. No OSSIE_SQL_2026
+    expression: `ALL` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context:
+    no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Mix
+- name: share_of_state_sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Sales kWh], CALCULATE ( [Sales kWh], ALL ( Sector ) ) )
+  datatype: Decimal
+  description: 'Share of the selected states'' retail sales, across all four sectors, that the selected sectors
+    account for. No OSSIE_SQL_2026 expression: `ALL` reads or removes what the report has filtered. OSSIE_SQL_2026
+    metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Mix
+- name: sales_ytd_kwh
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Sales kWh], 'Date'[Date] ) )
+  datatype: Decimal
+  description: 'Retail sales year to date: January through the selected month of the same calendar year. Blank after
+    the last month in the data. No OSSIE_SQL_2026 expression: `TOTALYTD` shifts or accumulates dates through the
+    Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s
+    date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: revenue_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Revenue], 'Date'[Date] ) )
+  datatype: Decimal
+  description: 'Revenue year to date: January through the selected month of the same calendar year. Blank after
+    the last month in the data. No OSSIE_SQL_2026 expression: `TOTALYTD` shifts or accumulates dates through the
+    Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s
+    date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time
+- name: sales_prior_year_kwh
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = EOMONTH ( [Last Data Date], 0 ) RETURN CALCULATE ( [Sales kWh], SAMEPERIODLASTYEAR
+        ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Retail sales in the same period one year earlier, over the same months that have data now: for a
+    year still in progress it is the prior year''s same months, not the whole prior year, so the YoY measures compare
+    like with like. No OSSIE_SQL_2026 expression: `EOMONTH` shifts or accumulates dates through the Power BI date
+    table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: revenue_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = EOMONTH ( [Last Data Date], 0 ) RETURN CALCULATE ( [Revenue], SAMEPERIODLASTYEAR
+        ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Revenue in the same period one year earlier, over the same months that have data now: for a year
+    still in progress it is the prior year''s same months, not the whole prior year, so the YoY measures compare
+    like with like. No OSSIE_SQL_2026 expression: `EOMONTH` shifts or accumulates dates through the Power BI date
+    table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time
+- name: price_prior_year_cents_per_kwh
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = EOMONTH ( [Last Data Date], 0 ) RETURN CALCULATE ( [Price cents per kWh], SAMEPERIODLASTYEAR
+        ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Average retail price in cents per kWh in the same period one year earlier, over the same months
+    that have data now: for a year still in progress it is the prior year''s same months, not the whole prior year,
+    so the YoY measures compare like with like. No OSSIE_SQL_2026 expression: `EOMONTH` shifts or accumulates dates
+    through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move
+    the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Time
+- name: sales_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Sales kWh] ), DIVIDE ( [Sales kWh] - [Sales prior year kWh], [Sales prior
+        year kWh] ) )
+  datatype: Decimal
+  description: 'Change in retail sales against the same period a year earlier, as a percentage of the prior year.
+    No OSSIE_SQL_2026 expression: Depends on `sales_prior_year_kwh`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: revenue_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Revenue] ), DIVIDE ( [Revenue] - [Revenue prior year], [Revenue prior year]
+        ) )
+  datatype: Decimal
+  description: 'Change in revenue against the same period a year earlier, as a percentage of the prior year. No
+    OSSIE_SQL_2026 expression: Depends on `revenue_prior_year`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: price_yoy_cents
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Price cents per kWh] ) && NOT ISBLANK ( [Price prior year cents per kWh] ),
+        [Price cents per kWh] - [Price prior year cents per kWh] )
+  datatype: Decimal
+  description: 'Change in average retail price against the same period a year earlier, in cents per kWh. No OSSIE_SQL_2026
+    expression: Depends on `price_prior_year_cents_per_kwh`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.00;-0.00;0.00
+      display_folder: Time
+- name: sales_latest_month_kwh
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastMonth = MAX ( 'Fact Retail Sales'[Date] ) RETURN CALCULATE ( [Sales kWh], 'Date'[Date]
+        = LastMonth )
+  datatype: Decimal
+  description: 'Retail sales in the latest month that has data within the current filter context (the file is published
+    with a lag, so this is not the calendar''s last month). No OSSIE_SQL_2026 expression: sales in the latest month
+    inside the current filters. Needs the max date of the query''s own rows.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: last_data_date
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( MAX ( 'Fact Retail Sales'[Date] ), REMOVEFILTERS () )
+  datatype: Date
+  description: 'First day of the latest month in the whole file, ignoring filters. Stops year-to-date measures at
+    the data. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026
+    metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Audit
+      is_hidden: true

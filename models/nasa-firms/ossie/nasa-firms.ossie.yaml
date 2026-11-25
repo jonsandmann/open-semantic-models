@@ -1,0 +1,818 @@
+# Apache Ossie Core Metadata Specification twin of models/nasa-firms (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: nasa_firms
+datasets:
+- name: confidence_band
+  source: nasa_firms.confidence_band
+  description: 'Detection confidence on one scale for both instruments: VIIRS l, n, h become Low, Nominal, High;
+    MODIS 0 to 100 becomes Low under 30, Nominal 30 to 79, High 80 and over.'
+  primary_key:
+  - confidence_band
+  fields:
+  - name: confidence_band
+    expression:
+      sql: confidence_band
+    datatype: String
+    description: Low, Nominal or High. Primary key, related to 'Fact Detection'[Confidence Band].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Band Sort
+  - name: band_sort
+    expression:
+      sql: band_sort
+    datatype: Integer
+    description: 'Sort order: 1 Low, 2 Nominal, 3 High.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: country
+  source: nasa_firms.country
+  description: Country of the FIRMS country file the detection came from (the file is already clipped to the country).
+    One row per country loaded.
+  primary_key:
+  - country
+  fields:
+  - name: country
+    expression:
+      sql: country
+    datatype: String
+    description: Country name, for example Portugal. Primary key, related to 'Fact Detection'[Country].
+- name: date
+  source: nasa_firms.date
+  description: 'Calendar dimension, one row per day from 1 January FirstYear to 31 December LastYear. Marked as
+    the model''s date table. Related to ''Fact Detection''[Acq Date], the UTC date of the satellite acquisition:
+    not Portugal''s local date (a detection at 23:30 UTC in summer is already the next day locally). There is no
+    second date.'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date (UTC). Primary key, related to 'Fact Detection'[Acq Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: day_night
+  source: nasa_firms.day_night
+  description: The satellite's day or night flag for the pixel (from the solar zenith angle), not local civil time.
+  primary_key:
+  - day_night
+  fields:
+  - name: day_night
+    expression:
+      sql: day_night
+    datatype: String
+    description: Day or Night. Primary key, related to 'Fact Detection'[Day Night].
+- name: fact_detection
+  source: nasa_firms.fact_detection
+  description: 'Fact table: NASA FIRMS active-fire detections from the country yearly archive files, one row per
+    detection (one satellite pixel on one overpass) for each product, country and year loaded. A detection is not
+    a fire: the same fire is seen again on the next overpass and by the other satellites, so the three products
+    are never added (the source rule in every measure). Every column is hidden; analysis goes through the measures
+    and the dimensions. Source: NASA LANCE FIRMS, CC0 with a requested citation (the Citation measure).'
+  fields:
+  - name: detection_key
+    expression:
+      sql: detection_key
+    datatype: String
+    description: Source, acquisition date, time, latitude and longitude joined with "|". Unique in the loaded files.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: acq_date
+    expression:
+      sql: acq_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: UTC calendar date of the acquisition, not Portugal's local date (UTC+1 in summer). Foreign key
+      to 'Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: acq_time
+    expression:
+      sql: acq_time
+    datatype: String
+    description: Acquisition time, HHMM UTC. Text, not a date.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: source
+    expression:
+      sql: source
+    datatype: String
+    description: 'Product: VIIRS NOAA-20, VIIRS S-NPP or MODIS, from the file. Foreign key to Source[Source].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: satellite
+    expression:
+      sql: satellite
+    datatype: String
+    description: 'Satellite code: N20, N, Terra, Aqua. Foreign key to Satellite[Satellite].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: country
+    expression:
+      sql: country
+    datatype: String
+    description: Country of the file. Foreign key to Country[Country].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: latitude
+    expression:
+      sql: latitude
+    datatype: Decimal
+    description: Pixel centre latitude, WGS84, kept to four decimals (about 11 m; the pixel is 375 m or 1 km).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.0000'
+        data_category: Latitude
+  - name: longitude
+    expression:
+      sql: longitude
+    datatype: Decimal
+    description: Pixel centre longitude, WGS84, kept to four decimals.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.0000'
+        data_category: Longitude
+  - name: frp
+    expression:
+      sql: frp
+    datatype: Decimal
+    description: Fire radiative power of the pixel in megawatts. Read through Total FRP and Average FRP.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0.00'
+  - name: confidence
+    expression:
+      sql: confidence
+    datatype: String
+    description: 'Confidence as published: VIIRS l, n or h; MODIS 0 to 100.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: confidence_band
+    expression:
+      sql: confidence_band
+    datatype: String
+    description: Low, Nominal or High on one scale for both instruments. Foreign key to 'Confidence Band'[Confidence
+      Band].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: day_night
+    expression:
+      sql: day_night
+    datatype: String
+    description: Day or Night (the satellite's flag). Foreign key to 'Day Night'[Day Night].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: type_code
+    expression:
+      sql: type_code
+    datatype: String
+    description: Hotspot type code 0 to 3. Foreign key to 'Hotspot Type'[Type Code].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: brightness
+    expression:
+      sql: brightness
+    datatype: Decimal
+    description: Brightness temperature in kelvin (VIIRS I-4 channel, MODIS channel 21/22). Not comparable across
+      instruments.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.00'
+  metrics:
+  - name: all_product_rows
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: 'Every detection row in context, all sources added. Audit only: it counts the same fire once per
+      product that saw it.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( 'Fact Detection' )
+        format_string: '#,0'
+        display_folder: Audit
+        is_hidden: true
+- name: hotspot_type
+  source: nasa_firms.hotspot_type
+  description: FIRMS's inferred hotspot type. Every type is loaded and counted by default; Vegetation detections
+    and Vegetation FRP keep type 0 only. Static land sources (gas flares, industrial heat) stay in the data so the
+    counts agree with FIRMS.
+  primary_key:
+  - type_code
+  fields:
+  - name: type_code
+    expression:
+      sql: type_code
+    datatype: String
+    description: FIRMS type code 0 to 3. Primary key, related to 'Fact Detection'[Type Code].
+  - name: hotspot_type
+    expression:
+      sql: hotspot_type
+    datatype: String
+    description: Presumed vegetation fire (0), Active volcano (1), Other static land source (2), Offshore (3).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Type Code
+- name: satellite
+  source: nasa_firms.satellite
+  description: 'The four satellites behind the three products: NOAA-20 (VIIRS NOAA-20), Suomi NPP (VIIRS S-NPP),
+    and Terra and Aqua, the morning and afternoon overpasses of the one MODIS product. Picking satellites counts
+    as picking their sources: Terra and Aqua together are one source (MODIS); NOAA-20 with Terra is two, and the
+    rule returns blank.'
+  primary_key:
+  - satellite
+  fields:
+  - name: satellite
+    expression:
+      sql: satellite
+    datatype: String
+    description: 'FIRMS''s satellite code: N20, N (Suomi NPP), Terra, Aqua. Primary key, related to ''Fact Detection''[Satellite].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Satellite Sort
+  - name: satellite_name
+    expression:
+      sql: satellite_name
+    datatype: String
+    description: 'Satellite name: NOAA-20, Suomi NPP, Terra or Aqua.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Satellite Sort
+  - name: source
+    expression:
+      sql: source
+    datatype: String
+    description: The product the satellite's detections belong to (same names as Source[Source]). The source rule
+      reads it.
+  - name: satellite_sort
+    expression:
+      sql: satellite_sort
+    datatype: Integer
+    description: 'Sort order: NOAA-20, Suomi NPP, Terra, Aqua.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: source
+  source: nasa_firms.source
+  description: 'The three FIRMS active-fire products. Each sees the same fires on its own overpasses, so their detections
+    are never added: a pixel that all three see is three rows. Every measure in the Detections, FRP and Time folders
+    reads VIIRS NOAA-20 when no source is picked, one source when one is picked, and blank when two or three are.'
+  primary_key:
+  - source
+  fields:
+  - name: source
+    expression:
+      sql: source
+    datatype: String
+    description: VIIRS NOAA-20, VIIRS S-NPP or MODIS. Primary key, related to 'Fact Detection'[Source].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Source Sort
+  - name: instrument
+    expression:
+      sql: instrument
+    datatype: String
+    description: VIIRS (375 m) or MODIS (1 km).
+  - name: pixel
+    expression:
+      sql: pixel
+    datatype: String
+    description: 'Nominal pixel size at nadir, 375 m or 1 km. A label: never multiply it by detections (overpasses
+      overlap and pixels grow off nadir).'
+  - name: source_sort
+    expression:
+      sql: source_sort
+    datatype: Integer
+    description: 'Sort order: 1 VIIRS NOAA-20 (the default product), 2 VIIRS S-NPP, 3 MODIS.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+relationships:
+- name: fact_detection_to_date
+  from: fact_detection
+  to: date
+  from_columns:
+  - acq_date
+  to_columns:
+  - date
+- name: fact_detection_to_source
+  from: fact_detection
+  to: source
+  from_columns:
+  - source
+  to_columns:
+  - source
+- name: fact_detection_to_satellite
+  from: fact_detection
+  to: satellite
+  from_columns:
+  - satellite
+  to_columns:
+  - satellite
+- name: fact_detection_to_country
+  from: fact_detection
+  to: country
+  from_columns:
+  - country
+  to_columns:
+  - country
+- name: fact_detection_to_confidence_band
+  from: fact_detection
+  to: confidence_band
+  from_columns:
+  - confidence_band
+  to_columns:
+  - confidence_band
+- name: fact_detection_to_day_night
+  from: fact_detection
+  to: day_night
+  from_columns:
+  - day_night
+  to_columns:
+  - day_night
+- name: fact_detection_to_hotspot_type
+  from: fact_detection
+  to: hotspot_type
+  from_columns:
+  - type_code
+  to_columns:
+  - type_code
+metrics:
+- name: detections
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Picked = ISFILTERED ( Source ) || ISFILTERED ( Satellite ) VAR SourceCount = COUNTROWS ( INTERSECT
+        ( VALUES ( Source[Source] ), VALUES ( Satellite[Source] ) ) ) RETURN SWITCH ( TRUE (), NOT Picked, CALCULATE
+        ( COUNTROWS ( 'Fact Detection' ), Source[Source] = "VIIRS NOAA-20" ), SourceCount = 1, COUNTROWS ( 'Fact
+        Detection' ) )
+  datatype: Decimal
+  description: 'Detections under the source rule: VIIRS NOAA-20 when no source or satellite is picked, the one source
+    picked, or blank when two or three sources are picked (adding products counts the same fire two or three times).
+    No OSSIE_SQL_2026 expression: counts VIIRS NOAA-20 only when no source or satellite is picked, and the picked
+    source otherwise, so the three overlapping products are never added. `ISFILTERED` has no Ossie form; `COUNT(*)
+    FILTER (WHERE source = ''VIIRS NOAA-20'')` would be right only for the default view.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Detections
+- name: detections_in_source
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( COUNTROWS ( INTERSECT ( VALUES ( Source[Source] ), VALUES ( Satellite[Source] ) ) ) = 1,
+        COUNTROWS ( 'Fact Detection' ) )
+  datatype: Decimal
+  description: 'Detections of the one source in context, for a matrix with Source on rows. Blank wherever more than
+    one source is in context, including the matrix total and an unfiltered card, so the three rows are never summed.
+    No OSSIE_SQL_2026 expression: blank unless exactly one source is in the filters (`INTERSECT(VALUES(...))`).
+    Reads the query''s filters.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Detections
+- name: vegetation_detections
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Detections], KEEPFILTERS ( 'Hotspot Type'[Type Code] = "0" ) )
+  datatype: Decimal
+  description: 'Detections of presumed vegetation fires (hotspot type 0), under the source rule. No OSSIE_SQL_2026
+    expression: Depends on `detections`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Detections
+- name: high_confidence_detections
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Detections], KEEPFILTERS ( 'Confidence Band'[Confidence Band] = "High" ) )
+  datatype: Decimal
+  description: 'High-confidence detections (VIIRS h, MODIS 80 and over), under the source rule. No OSSIE_SQL_2026
+    expression: Depends on `detections`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Detections
+- name: high_confidence_share
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [High confidence detections], [Detections] )
+  datatype: Decimal
+  description: 'High-confidence detections as a share of detections, same source on both sides. No OSSIE_SQL_2026
+    expression: Depends on `high_confidence_detections`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Detections
+- name: day_share
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( CALCULATE ( [Detections], KEEPFILTERS ( 'Day Night'[Day Night] = "Day" ) ), [Detections]
+        )
+  datatype: Decimal
+  description: 'Daytime detections (the satellite''s day flag) as a share of detections, same source on both sides.
+    No OSSIE_SQL_2026 expression: Depends on `detections`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Detections
+- name: satellites_in_scope
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Picked = ISFILTERED ( Source ) || ISFILTERED ( Satellite ) VAR SourceCount = COUNTROWS ( INTERSECT
+        ( VALUES ( Source[Source] ), VALUES ( Satellite[Source] ) ) ) RETURN SWITCH ( TRUE (), NOT Picked, CALCULATE
+        ( DISTINCTCOUNT ( 'Fact Detection'[Satellite] ), Source[Source] = "VIIRS NOAA-20" ), SourceCount = 1, DISTINCTCOUNT
+        ( 'Fact Detection'[Satellite] ) )
+  datatype: Decimal
+  description: 'Satellites with a detection in context, under the source rule: 1 for NOAA-20 or S-NPP, up to 2 for
+    MODIS (Terra and Aqua). No OSSIE_SQL_2026 expression: same source rule as `detections`.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0'
+      display_folder: Detections
+- name: total_frp
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Picked = ISFILTERED ( Source ) || ISFILTERED ( Satellite ) VAR SourceCount = COUNTROWS ( INTERSECT
+        ( VALUES ( Source[Source] ), VALUES ( Satellite[Source] ) ) ) RETURN SWITCH ( TRUE (), NOT Picked, CALCULATE
+        ( SUM ( 'Fact Detection'[FRP] ), Source[Source] = "VIIRS NOAA-20" ), SourceCount = 1, SUM ( 'Fact Detection'[FRP]
+        ) )
+  datatype: Decimal
+  description: 'Sum of pixel fire radiative power in megawatts, under the source rule. A sum over pixels and overpasses,
+    not the power of distinct fires; VIIRS and MODIS totals are not comparable (different pixel sizes). No OSSIE_SQL_2026
+    expression: same source rule as `detections`.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0.0'
+      display_folder: FRP
+- name: average_frp
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Total FRP], [Detections] )
+  datatype: Decimal
+  description: 'Mean FRP per detection in megawatts, under the source rule. The mean of pixels, not the power of
+    a fire. No OSSIE_SQL_2026 expression: Depends on `total_frp`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: FRP
+- name: vegetation_frp
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Total FRP], KEEPFILTERS ( 'Hotspot Type'[Type Code] = "0" ) )
+  datatype: Decimal
+  description: 'FRP of presumed vegetation fires (hotspot type 0), under the source rule. No OSSIE_SQL_2026 expression:
+    Depends on `total_frp`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0.0'
+      display_folder: FRP
+- name: last_acq_date
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( MAX ( 'Fact Detection'[Acq Date] ), REMOVEFILTERS () )
+  datatype: Date
+  description: 'Latest acquisition date in the model, ignoring every filter. The year-to-date and prior-year measures
+    read it. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026
+    metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Time
+      is_hidden: true
+- name: detections_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Acq Date], TOTALYTD ( [Detections], 'Date'[Date] ) )
+  datatype: Decimal
+  description: 'Detections year to date by UTC acquisition date, under the source rule. Blank for a period that
+    starts after the last acquisition date loaded. No OSSIE_SQL_2026 expression: `TOTALYTD` shifts or accumulates
+    dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t
+    move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: detections_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last Acq Date] RETURN CALCULATE ( [Detections], SAMEPERIODLASTYEAR ( FILTER ( VALUES
+        ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Detections in the same period one year earlier (UTC acquisition date), over the same days that have
+    data now, under the source rule. No OSSIE_SQL_2026 expression: `SAMEPERIODLASTYEAR` shifts or accumulates dates
+    through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move
+    the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: detections_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Detections] ), DIVIDE ( [Detections] - [Detections prior year], [Detections
+        prior year] ) )
+  datatype: Decimal
+  description: 'Change in detections against the same period a year earlier, as a percentage of the prior year.
+    No OSSIE_SQL_2026 expression: Depends on `detections`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: frp_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last Acq Date] RETURN CALCULATE ( [Total FRP], SAMEPERIODLASTYEAR ( FILTER ( VALUES
+        ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Total FRP in the same period one year earlier, over the same days that have data now, under the
+    source rule. No OSSIE_SQL_2026 expression: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power
+    BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date
+    filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0.0'
+      display_folder: Time
+- name: frp_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Total FRP] ), DIVIDE ( [Total FRP] - [FRP prior year], [FRP prior year] )
+        )
+  datatype: Decimal
+  description: 'Change in total FRP against the same period a year earlier, as a percentage of the prior year. No
+    OSSIE_SQL_2026 expression: Depends on `total_frp`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: peak_day
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Detections] ), MAXX ( TOPN ( 1, VALUES ( 'Date'[Date] ), [Detections] ), 'Date'[Date]
+        ) )
+  datatype: Decimal
+  description: 'The UTC acquisition date in context with the most detections, under the source rule. On a tie, the
+    latest of the tied dates. No OSSIE_SQL_2026 expression: `TOPN` over the days in the filters, ranked by a measure.
+    A ranking over a grain, not one aggregate.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Time
+- name: peak_day_detections
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR PeakDate = [Peak day] RETURN IF ( NOT ISBLANK ( PeakDate ), CALCULATE ( [Detections], 'Date'[Date]
+        = PeakDate ) )
+  datatype: Decimal
+  description: 'Detections on the peak day, under the source rule. No OSSIE_SQL_2026 expression: Depends on `peak_day`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: static_land_detections
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Detections], KEEPFILTERS ( 'Hotspot Type'[Type Code] = "2" ) )
+  datatype: Decimal
+  description: 'Detections of other static land sources (hotspot type 2: gas flares, industrial heat), under the
+    source rule. Included in Detections. No OSSIE_SQL_2026 expression: Depends on `detections`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Audit
+- name: low_confidence_detections
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Detections], KEEPFILTERS ( 'Confidence Band'[Confidence Band] = "Low" ) )
+  datatype: Decimal
+  description: 'Low-confidence detections (VIIRS l, MODIS under 30), under the source rule. Included in Detections.
+    No OSSIE_SQL_2026 expression: Depends on `detections`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Audit
+- name: citation
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: '"We acknowledge the use of data and/or imagery from NASA''s Fire Information for Resource Management
+        System (FIRMS) (https://www.earthdata.nasa.gov/firms), part of NASA''s Earth Science Data and Information
+        System (ESDIS). Data: NASA LANCE FIRMS country yearly active-fire CSVs (MODIS C6.1, VIIRS S-NPP, VIIRS NOAA-20)."'
+  datatype: String
+  description: 'The citation NASA asks for on anything built from FIRMS data. Put it on every report page. No OSSIE_SQL_2026
+    expression: a citation or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '@'
+      display_folder: About
+- name: disclaimer
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: '"The LANCE system is operated by the NASA/GSFC Earth Science Data and Information System (ESDIS).
+        The information presented through LANCE, Rapid Response, GIBS, Worldview, and FIRMS are provided ""as is""
+        and users bear all responsibility and liability for their use of data. Full disclaimer: https://www.earthdata.nasa.gov/data/tools/firms"'
+  datatype: String
+  description: 'NASA''s disclaimer for LANCE and FIRMS data, which NASA asks to be carried with the data. No OSSIE_SQL_2026
+    expression: a citation or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '@'
+      display_folder: About

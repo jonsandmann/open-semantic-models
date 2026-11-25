@@ -1,0 +1,937 @@
+# Apache Ossie Core Metadata Specification twin of models/building-permits (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: building_permits
+datasets:
+- name: apply_date
+  source: building_permits.apply_date
+  description: 'Application calendar: the day the owner asked. A leading indicator; Boston, Philadelphia and many
+    LA over-the-counter rows have no apply date. Marked as a date table. A slicer here filters only this date role;
+    Issue Date, Apply Date and Final Date are three calendars on the same days (CMS/NOAA role-playing lesson).'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Permit'[Applied Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: category
+  source: building_permits.category
+  description: 'The 14 common work categories from the data factory crosswalk (schema.md). Compare categories, not
+    raw permit totals: NYC issues one work permit per trade per job and Seattle''s file holds no trades.'
+  primary_key:
+  - category_key
+  fields:
+  - name: category_key
+    expression:
+      sql: category_key
+    datatype: String
+    description: Category code as stored on the fact, for example new_residential. Primary key.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: category
+    expression:
+      sql: category
+    datatype: String
+    description: Display name, for example New residential.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Category Sort
+  - name: work_class
+    expression:
+      sql: work_class
+    datatype: String
+    description: 'Work class the category belongs to: new, addition, alteration, demolition, trade or other.'
+  - name: category_sort
+    expression:
+      sql: category_sort
+    datatype: Integer
+    description: Sort order matching schema.md.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: fact_permit
+  source: building_permits.fact_permit
+  description: 'Fact table: one row per permit as the city defines a permit (the data factory''s permits.parquet).
+    Housing Units Contribution already de-duplicates Austin related building permits that copy the same unit count
+    under one master, includes Los Angeles mixed-use apartments filed as commercial, and is zero on every other
+    category. Every column is hidden; analysis goes through the measures and the dimensions. Counts follow Issue
+    Date unless the visual uses Apply Date or Final Date.'
+  fields:
+  - name: permit_key
+    expression:
+      sql: permit_key
+    datatype: String
+    description: Jurisdiction and source permit number, unique across the ten cities.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: jurisdiction
+    expression:
+      sql: jurisdiction
+    datatype: String
+    description: Jurisdiction name, related to Jurisdiction.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: category_key
+    expression:
+      sql: category_key
+    datatype: String
+    description: Category code, related to Category.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: work_class
+    expression:
+      sql: work_class
+    datatype: String
+    description: Work class, related to Work Class.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: use_class
+    expression:
+      sql: use_class
+    datatype: String
+    description: Use class, related to Use Class.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: status
+    expression:
+      sql: status
+    datatype: String
+    description: Status, related to Status.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: applied_date
+    expression:
+      sql: applied_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Application / filing date, related to Apply Date.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: issued_date
+    expression:
+      sql: issued_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Permit issued date, related to Issue Date. Headline counts use this date.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: final_date
+    expression:
+      sql: final_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Final / certificate date, related to Final Date.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: units_added
+    expression:
+      sql: units_added
+    datatype: Integer
+    description: Net dwelling units the source published on this permit. Can repeat across Austin related permits;
+      do not SUM this. Use Housing Units.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0'
+  - name: housing_units_contribution
+    expression:
+      sql: housing_units_contribution
+    datatype: Integer
+    description: Dwelling units this row contributes to Housing Units after Austin de-duplication and Los Angeles
+      mixed-use inclusion.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0'
+  - name: valuation_usable
+    expression:
+      sql: valuation_usable
+    datatype: Decimal
+    description: Declared value included in Valuation USD (blank for Austin and for values outside 1 .. 2e9).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0;(\$#,0);\$#,0
+  - name: days_apply_to_issue
+    expression:
+      sql: days_apply_to_issue
+    datatype: Integer
+    description: Issued date minus applied date, only when both exist and issue is on or after apply.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0'
+  metrics:
+  - name: permits
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: Permits in context, every category and jurisdiction. A permit is not the same unit everywhere (NYC
+      issues one work permit per trade per job; Seattle's file holds no trades), so compare categories.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( 'Fact Permit' )
+        format_string: '#,0'
+        display_folder: Volume
+  - name: housing_units
+    expression:
+      sql: SUM(housing_units_contribution)
+    datatype: Decimal
+    description: Net dwelling units on new homes, Census BPS convention (issue date). Austin related permits that
+      copy the same unit count onto every building permit under one master (phases, fire areas, amenity buildings,
+      identical descriptions on 2–4 permits) count once. Los Angeles mixed-use apartment buildings filed as Bldg-New
+      Commercial Apartment are included. Boston, New Orleans and Montgomery County publish no usable unit counts
+      (blank here). Alteration conversions are excluded, matching BPS.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Permit'[Housing Units Contribution] )
+        format_string: '#,0'
+        display_folder: Housing
+  - name: units_in_200_plus_permits
+    expression:
+      sql: SUM(housing_units_contribution) FILTER (WHERE units_added >= 200)
+    datatype: Decimal
+    description: Housing units on permits of 200 or more units. The numerator of Share of units in 200+ permits.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Housing Units], KEEPFILTERS ( 'Fact Permit'[Units Added] >= 200 ) )
+        format_string: '#,0'
+        display_folder: Housing
+  - name: share_of_units_in_200_plus_permits
+    expression:
+      sql: SUM(housing_units_contribution) FILTER (WHERE units_added >= 200) / NULLIF(SUM(housing_units_contribution),
+        0)
+    datatype: Decimal
+    description: Share of Housing Units that sit on permits of 200 or more units (towers). New York 41% in 2023–2025;
+      Los Angeles 4%.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Units in 200+ Permits], [Housing Units] )
+        format_string: 0%
+        display_folder: Housing
+  - name: median_days_apply_to_issue
+    expression:
+      sql: MEDIAN(days_apply_to_issue)
+    datatype: Decimal
+    description: Median calendar days from application to issue for rows that have both dates and issue on or after
+      apply. FINDINGS.md reports this on new residential by issue year.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: MEDIAN ( 'Fact Permit'[Days Apply To Issue] )
+        format_string: '#,0'
+        display_folder: Speed
+  - name: same_day_issue_share
+    expression:
+      sql: COALESCE(COUNT(*) FILTER (WHERE days_apply_to_issue = 0), 0) / NULLIF(COUNT(*) FILTER (WHERE days_apply_to_issue
+        IS NOT NULL), 0)
+    datatype: Decimal
+    description: Share of permits in context issued the same day they were filed (Days Apply To Issue = 0).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( COALESCE ( CALCULATE ( [Permits], KEEPFILTERS ( 'Fact Permit'[Days Apply To Issue] = 0 ) ),
+          0 ), CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Days Apply To Issue] ) ) ) )
+        format_string: 0%
+        display_folder: Speed
+  - name: valuation_usd
+    expression:
+      sql: SUM(valuation_usable)
+    datatype: Decimal
+    description: Declared job value, US dollars, excluding Austin (the field is copied onto trades and is unusable)
+      and values outside 1 .. 2 billion (NYC $1,000 placeholders and a handful of overflows). Philadelphia publishes
+      none. Self-declared and nominal; within-city trends are sounder than cross-city levels.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( 'Fact Permit'[Valuation Usable] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Value
+  - name: last_issue_date
+    expression:
+      sql: MAX(issued_date)
+    datatype: Date
+    description: Last issue date in context, used by the prior-year measures.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: MAX ( 'Fact Permit'[Issued Date] )
+        format_string: yyyy-mm-dd
+        display_folder: Time
+        is_hidden: true
+  - name: applications
+    expression:
+      sql: COUNT(*) FILTER (WHERE applied_date IS NOT NULL)
+    datatype: Decimal
+    description: Permits that have an application date in context (Apply Date). Boston and Philadelphia publish
+      issued permits only.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Applied Date] ) ) )
+        format_string: '#,0'
+        display_folder: Pipeline
+  - name: finaled_permits
+    expression:
+      sql: COUNT(*) FILTER (WHERE final_date IS NOT NULL)
+    datatype: Decimal
+    description: Permits that have a final / certificate date in context (Final Date). Recent years are incomplete
+      by construction.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Permits], KEEPFILTERS ( NOT ISBLANK ( 'Fact Permit'[Final Date] ) ) )
+        format_string: '#,0'
+        display_folder: Pipeline
+- name: final_date
+  source: building_permits.final_date
+  description: 'Final calendar: the day the work passed final inspection or received a certificate. Trails issue,
+    so recent years are incomplete. Marked as a date table. A slicer here filters only this date role; Issue Date,
+    Apply Date and Final Date are three calendars on the same days (CMS/NOAA role-playing lesson).'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Permit'[Final Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: issue_date
+  source: building_permits.issue_date
+  description: 'Issue calendar: the day the city said yes. Census BPS convention; FINDINGS.md counts by this date
+    unless they say otherwise. Marked as a date table. A slicer here filters only this date role; Issue Date, Apply
+    Date and Final Date are three calendars on the same days (CMS/NOAA role-playing lesson).'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Permit'[Issued Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: jurisdiction
+  source: building_permits.jurisdiction
+  description: The ten jurisdictions in the data factory join. Population is Census Vintage 2024 place (or county
+    for Montgomery). Units Published is false where the source has no dwelling-unit field (Boston, New Orleans)
+    or only a 1-per-house proxy (Montgomery County). Static table from the factory's analyze.py and SOURCES.md.
+  primary_key:
+  - jurisdiction
+  fields:
+  - name: jurisdiction
+    expression:
+      sql: jurisdiction
+    datatype: String
+    description: Jurisdiction name as stored on the fact, for example Austin, TX. Primary key.
+  - name: population
+    expression:
+      sql: population
+    datatype: Integer
+    description: Census Vintage 2024 resident population of the city (Montgomery County, MD is the county). Denominator
+      of Housing Units per 1,000 per Year.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '#,0'
+  - name: units_published
+    expression:
+      sql: units_published
+    datatype: Boolean
+    description: True when the source publishes a usable net dwelling-unit count on new residential work. False
+      for Boston, New Orleans and Montgomery County.
+  - name: licence
+    expression:
+      sql: licence
+    datatype: String
+    description: Licence of the published dataset, as verified 24 Nov 2026.
+- name: status
+  source: building_permits.status
+  description: Current status as mapped by the data factory from each source's own status string.
+  primary_key:
+  - status
+  fields:
+  - name: status
+    expression:
+      sql: status
+    datatype: String
+    description: Status key, related to 'Fact Permit'[Status]. Primary key.
+  - name: status_label
+    expression:
+      sql: status_label
+    datatype: String
+    description: Display label.
+- name: use_class
+  source: building_permits.use_class
+  description: 'Use of the building as mapped by the data factory: residential, nonresidential, mixed, residential_or_mixed
+    (NYC Other buildings with dwelling units), unknown.'
+  primary_key:
+  - use_class
+  fields:
+  - name: use_class
+    expression:
+      sql: use_class
+    datatype: String
+    description: Use class key, related to 'Fact Permit'[Use Class]. Primary key.
+  - name: use_class_label
+    expression:
+      sql: use_class_label
+    datatype: String
+    description: Display label.
+- name: work_class
+  source: building_permits.work_class
+  description: 'Work class derived from category: new, addition, alteration, demolition, trade, other.'
+  primary_key:
+  - work_class
+  fields:
+  - name: work_class
+    expression:
+      sql: work_class
+    datatype: String
+    description: Work class key, related to 'Fact Permit'[Work Class]. Primary key.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Work Class Sort
+  - name: work_class_sort
+    expression:
+      sql: work_class_sort
+    datatype: Integer
+    description: 'Sort order for Work Class: new, addition, alteration, demolition, trade, other.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+relationships:
+- name: fact_permit_to_issue_date
+  from: fact_permit
+  to: issue_date
+  from_columns:
+  - issued_date
+  to_columns:
+  - date
+- name: fact_permit_to_apply_date
+  from: fact_permit
+  to: apply_date
+  from_columns:
+  - applied_date
+  to_columns:
+  - date
+- name: fact_permit_to_final_date
+  from: fact_permit
+  to: final_date
+  from_columns:
+  - final_date
+  to_columns:
+  - date
+- name: fact_permit_to_jurisdiction
+  from: fact_permit
+  to: jurisdiction
+  from_columns:
+  - jurisdiction
+  to_columns:
+  - jurisdiction
+- name: fact_permit_to_category
+  from: fact_permit
+  to: category
+  from_columns:
+  - category_key
+  to_columns:
+  - category_key
+- name: fact_permit_to_work_class
+  from: fact_permit
+  to: work_class
+  from_columns:
+  - work_class
+  to_columns:
+  - work_class
+- name: fact_permit_to_use_class
+  from: fact_permit
+  to: use_class
+  from_columns:
+  - use_class
+  to_columns:
+  - use_class
+- name: fact_permit_to_status
+  from: fact_permit
+  to: status
+  from_columns:
+  - status
+  to_columns:
+  - status
+metrics:
+- name: housing_units_per_1_000_per_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Years = CALCULATE ( DISTINCTCOUNT ( 'Issue Date'[Year] ), 'Fact Permit'[Housing Units Contribution]
+        <> 0 ) VAR Pop = MAX ( Jurisdiction[Population] ) VAR One = DISTINCTCOUNT ( Jurisdiction[Jurisdiction] )
+        = 1 RETURN IF ( One, DIVIDE ( [Housing Units], Years * Pop ) * 1000 )
+  datatype: Decimal
+  description: 'Housing Units per 1,000 residents per year in context. Population is Census Vintage 2024 on Jurisdiction.
+    The year count is distinct Issue Date years that have housing units, so a 2024–2025 Chicago slice divides by
+    two. No OSSIE_SQL_2026 expression: blank unless one jurisdiction is in the filters; divides by that jurisdiction''s
+    population (from the Jurisdiction table) and by the number of issue years with housing units. Needs the filter
+    guard and fields of two other datasets.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Housing
+- name: new_construction_valuation
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Valuation USD], KEEPFILTERS ( Category[Work Class] = "new" ) )
+  datatype: Decimal
+  description: 'New-construction declared value: Valuation USD on new residential and new non-residential only.
+    No OSSIE_SQL_2026 expression: `FILTER (WHERE ...)` may only reference the aggregate''s own dataset, and the
+    fact has no copy of that column.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Value
+- name: permits_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last Issue Date] RETURN CALCULATE ( [Permits], SAMEPERIODLASTYEAR ( FILTER ( VALUES
+        ( 'Issue Date'[Date] ), 'Issue Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Permits in the same Issue Date period one year earlier, through the last loaded issue date. No OSSIE_SQL_2026
+    expression: `SAMEPERIODLASTYEAR` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026
+    has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: permits_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Permits] - [Permits Prior Year], [Permits Prior Year] )
+  datatype: Decimal
+  description: 'Year-over-year change in Permits. Blank when the current value is blank. No OSSIE_SQL_2026 expression:
+    Depends on `permits_prior_year`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Time
+- name: housing_units_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = [Last Issue Date] RETURN CALCULATE ( [Housing Units], SAMEPERIODLASTYEAR ( FILTER
+        ( VALUES ( 'Issue Date'[Date] ), 'Issue Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Housing Units in the same Issue Date period one year earlier. No OSSIE_SQL_2026 expression: `SAMEPERIODLASTYEAR`
+    shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions,
+    and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: housing_units_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Housing Units] - [Housing Units Prior Year], [Housing Units Prior Year] )
+  datatype: Decimal
+  description: 'Year-over-year change in Housing Units. Blank when the current value is blank. No OSSIE_SQL_2026
+    expression: Depends on `housing_units_prior_year`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Time
+- name: attribution
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: '"Joined from ten open building-permit datasets (Seattle SDCI, NYC DOB, Chicago, San Francisco
+        DBI, Los Angeles LADBS, Austin DSD, Boston ISD, Philadelphia L&I, New Orleans Safety & Permits, Montgomery
+        County MD DPS). Population: Census Bureau Vintage 2024. See each Jurisdiction[Licence]."'
+  datatype: String
+  description: 'Required attribution for reports built from this model. No OSSIE_SQL_2026 expression: a citation
+    or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '@'
+      display_folder: About

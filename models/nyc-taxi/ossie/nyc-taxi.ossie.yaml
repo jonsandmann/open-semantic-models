@@ -1,0 +1,1161 @@
+# Apache Ossie Core Metadata Specification twin of models/nyc-taxi (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: nyc_taxi
+datasets:
+- name: date
+  source: nyc_taxi.date
+  description: Calendar dimension, one row per day from CalendarStart to CalendarEnd (whole years). Marked as the
+    model's date table; drives year-to-date and prior-year measures.
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to Trips[Pickup Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2025.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4.
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2025 Q1. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20251.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Month and year, for example Jan 2025. Sorted by Year Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Number
+  - name: year_month_number
+    expression:
+      sql: year_month_number
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202501.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: day_of_month
+    expression:
+      sql: day_of_month
+    datatype: Integer
+    description: Day of the month, 1 to 31.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: day_of_week
+    expression:
+      sql: day_of_week
+    datatype: String
+    description: Weekday name, Monday to Sunday. Sorted by Day of Week Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Day of Week Number
+  - name: day_of_week_number
+    expression:
+      sql: day_of_week_number
+    datatype: Integer
+    description: Weekday as a number, Monday = 1 to Sunday = 7 (ISO).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: week_start
+    expression:
+      sql: week_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Monday that starts the ISO week containing the date.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: is_weekend
+    expression:
+      sql: is_weekend
+    datatype: Boolean
+    description: True on Saturday and Sunday.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: TRUE"";""TRUE"";""FALSE
+  - name: through_last_trip_date
+    expression:
+      dialects:
+      - dialect: DAX
+        expression: '''Date''[Date] <= MAX ( Trips[Pickup Date] )'
+    datatype: Boolean
+    description: 'True for every date on or before the last loaded pickup date, whether or not that day has trips:
+      a cutoff, not a per-day flag. The prior-year measures shift only these dates back a year, so a period that
+      runs past the loaded data (the current month, the current year) compares with the same span a year earlier.
+      Kept contiguous on purpose: DATEADD needs an unbroken run of dates. Calculated column in the TMDL model; carried
+      as opaque DAX, not portable.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: TRUE"";""TRUE"";""FALSE
+- name: dropoff_zone
+  source: nyc_taxi.dropoff_zone
+  description: Taxi zone where the meter was disengaged (dropoff). Role-playing copy of the TLC zone lookup (265
+    zones), loaded from the shared TaxiZoneLookup query.
+  primary_key:
+  - dropoff_location_id
+  fields:
+  - name: dropoff_location_id
+    expression:
+      sql: dropoff_location_id
+    datatype: Integer
+    description: TLC LocationID of the dropoff zone. Primary key, related to Trips[Dropoff Location ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: dropoff_borough
+    expression:
+      sql: dropoff_borough
+    datatype: String
+    description: 'Borough of the dropoff zone: Manhattan, Brooklyn, Queens, Bronx, Staten Island, EWR, or Unknown/N/A.'
+  - name: dropoff_zone_name
+    expression:
+      sql: dropoff_zone_name
+    datatype: String
+    description: Name of the dropoff taxi zone, for example JFK Airport or Upper East Side South.
+  - name: dropoff_service_zone
+    expression:
+      sql: dropoff_service_zone
+    datatype: String
+    description: 'TLC service zone of the dropoff: Yellow Zone (Manhattan core), Boro Zone, Airports, or EWR.'
+- name: payment_type
+  source: nyc_taxi.payment_type
+  description: How the passenger paid, per the TLC data dictionary, with a coarser Payment Group for reporting.
+  primary_key:
+  - payment_type_id
+  fields:
+  - name: payment_type_id
+    expression:
+      sql: payment_type_id
+    datatype: Integer
+    description: TLC payment_type code. Primary key, related to Trips[Payment Type ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: payment_type
+    expression:
+      sql: payment_type
+    datatype: String
+    description: 'Payment type: Flex Fare, Credit Card, Cash, No Charge, Dispute, Unknown or Voided. Sorted by Payment
+      Type ID.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Payment Type ID
+  - name: payment_group
+    expression:
+      sql: payment_group
+    datatype: String
+    description: 'Reporting group: Card, Cash, Flex Fare, Not Collected (no charge, dispute, voided) or Unknown.'
+- name: pickup_zone
+  source: nyc_taxi.pickup_zone
+  description: Taxi zone where the meter was engaged (pickup). Role-playing copy of the TLC zone lookup (265 zones),
+    loaded from the shared TaxiZoneLookup query.
+  primary_key:
+  - pickup_location_id
+  fields:
+  - name: pickup_location_id
+    expression:
+      sql: pickup_location_id
+    datatype: Integer
+    description: TLC LocationID of the pickup zone. Primary key, related to Trips[Pickup Location ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: pickup_borough
+    expression:
+      sql: pickup_borough
+    datatype: String
+    description: 'Borough of the pickup zone: Manhattan, Brooklyn, Queens, Bronx, Staten Island, EWR, or Unknown/N/A.'
+  - name: pickup_zone_name
+    expression:
+      sql: pickup_zone_name
+    datatype: String
+    description: Name of the pickup taxi zone, for example JFK Airport or Upper East Side South.
+  - name: pickup_service_zone
+    expression:
+      sql: pickup_service_zone
+    datatype: String
+    description: 'TLC service zone of the pickup: Yellow Zone (Manhattan core), Boro Zone, Airports, or EWR.'
+- name: rate_code
+  source: nyc_taxi.rate_code
+  description: Final rate code in effect at the end of the trip, per the TLC data dictionary.
+  primary_key:
+  - rate_code_id
+  fields:
+  - name: rate_code_id
+    expression:
+      sql: rate_code_id
+    datatype: Integer
+    description: TLC RatecodeID; 99 holds null or unknown codes. Primary key, related to Trips[Rate Code ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: rate_code
+    expression:
+      sql: rate_code
+    datatype: String
+    description: 'Rate code name: Standard, JFK, Newark, Nassau or Westchester, Negotiated, Group Ride, or Unknown.
+      Sorted by Rate Code ID.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Rate Code ID
+  - name: fare_basis
+    expression:
+      sql: fare_basis
+    datatype: String
+    description: Standard metered rate versus flat or negotiated fares (JFK flat fare, Newark, negotiated, group).
+- name: time_of_day
+  source: nyc_taxi.time_of_day
+  description: Hour-of-day dimension (24 rows) with day parts that match how taxi demand moves through the day.
+  primary_key:
+  - hour
+  fields:
+  - name: hour
+    expression:
+      sql: hour
+    datatype: Integer
+    description: Hour of day, 0 to 23. Primary key, related to Trips[Pickup Hour].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: hour_label
+    expression:
+      sql: hour_label
+    datatype: String
+    description: Hour as a clock label, 00:00 to 23:00. Sorted by Hour.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Hour
+  - name: day_part
+    expression:
+      sql: day_part
+    datatype: String
+    description: 'Part of the day: Overnight (0-5), Morning Rush (6-9), Midday (10-15), Evening Rush (16-19), Night
+      (20-23). Sorted by Day Part Number.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Day Part Number
+  - name: day_part_number
+    expression:
+      sql: day_part_number
+    datatype: Integer
+    description: Order of the day parts, 1 (Overnight) to 5 (Night).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: trips
+  source: nyc_taxi.trips
+  description: 'Fact table: one row per yellow taxi trip reported by a TPEP provider to the NYC Taxi & Limousine
+    Commission. Grain: trip. Every column is hidden; analysis goes through the measures below and the conformed
+    dimensions.'
+  fields:
+  - name: pickup_date
+    expression:
+      sql: pickup_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Pickup date (meter engaged). Foreign key to Date.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: pickup_hour
+    expression:
+      sql: pickup_hour
+    datatype: Integer
+    description: Pickup hour of day, 0 to 23. Foreign key to Time of Day.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: pickup_location_id
+    expression:
+      sql: pickup_location_id
+    datatype: Integer
+    description: TLC taxi zone where the meter was engaged. Foreign key to Pickup Zone.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: dropoff_location_id
+    expression:
+      sql: dropoff_location_id
+    datatype: Integer
+    description: TLC taxi zone where the meter was disengaged. Foreign key to Dropoff Zone.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: vendor_id
+    expression:
+      sql: vendor_id
+    datatype: Integer
+    description: TPEP provider that supplied the record. Foreign key to Vendor.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: rate_code_id
+    expression:
+      sql: rate_code_id
+    datatype: Integer
+    description: Final rate code in effect at the end of the trip; nulls are mapped to 99 (unknown). Foreign key
+      to Rate Code.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: payment_type_id
+    expression:
+      sql: payment_type_id
+    datatype: Integer
+    description: How the passenger paid. Foreign key to Payment Type.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: passenger_count
+    expression:
+      sql: passenger_count
+    datatype: Integer
+    description: Passengers in the vehicle, as entered by the driver. Blank when not reported.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: trip_miles
+    expression:
+      sql: trip_miles
+    datatype: Decimal
+    description: Elapsed trip distance in miles reported by the taximeter.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0.00'
+  - name: trip_minutes
+    expression:
+      sql: trip_minutes
+    datatype: Decimal
+    description: Minutes between meter engaged and disengaged, rounded to two decimals.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0.00'
+  - name: fare_amount
+    expression:
+      sql: fare_amount
+    datatype: Decimal
+    description: Time-and-distance fare calculated by the meter.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: extra_amount
+    expression:
+      sql: extra_amount
+    datatype: Decimal
+    description: Miscellaneous extras and surcharges (rush hour and overnight charges).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: mta_tax
+    expression:
+      sql: mta_tax
+    datatype: Decimal
+    description: MTA tax automatically triggered by the metered rate in use.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: tip_amount
+    expression:
+      sql: tip_amount
+    datatype: Decimal
+    description: Tip amount; populated automatically for credit card tips. Cash tips are not included.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: tolls_amount
+    expression:
+      sql: tolls_amount
+    datatype: Decimal
+    description: Total tolls paid on the trip.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: improvement_surcharge
+    expression:
+      sql: improvement_surcharge
+    datatype: Decimal
+    description: Improvement surcharge assessed at the flag drop.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: total_amount
+    expression:
+      sql: total_amount
+    datatype: Decimal
+    description: Total amount charged to passengers. Does not include cash tips.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: congestion_surcharge
+    expression:
+      sql: congestion_surcharge
+    datatype: Decimal
+    description: New York State congestion surcharge collected on the trip (0 when not reported).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: airport_fee
+    expression:
+      sql: airport_fee
+    datatype: Decimal
+    description: Airport fee for pickups at LaGuardia and JFK (0 when not charged).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  - name: cbd_congestion_fee
+    expression:
+      sql: cbd_congestion_fee
+    datatype: Decimal
+    description: MTA congestion relief zone fee, per trip, from 5 January 2025 (0 before that or when not charged).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0.00;(\$#,0.00);\$#,0.00
+  metrics:
+  - name: trips
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: Number of trips. The base count every other trip measure builds on.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( Trips )
+        format_string: '#,0'
+        display_folder: Volume
+  - name: passengers
+    expression:
+      sql: SUM(passenger_count)
+    datatype: Decimal
+    description: Passengers reported by the driver. Trips with no passenger count (mostly Flex Fare) add nothing.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[Passenger Count] )
+        format_string: '#,0'
+        display_folder: Volume
+  - name: avg_passengers_per_trip
+    expression:
+      sql: SUM(passenger_count) / NULLIF(COUNT(*) FILTER (WHERE passenger_count IS NOT NULL), 0)
+    datatype: Decimal
+    description: Average passengers per trip, over trips that report a passenger count.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Passengers], CALCULATE ( [Trips], KEEPFILTERS ( NOT ISBLANK ( Trips[Passenger Count] ) )
+          ) )
+        format_string: '#,0.00'
+        display_folder: Volume
+  - name: trips_per_day
+    expression:
+      sql: COUNT(*) / NULLIF(COUNT(DISTINCT pickup_date), 0)
+    datatype: Decimal
+    description: Average trips per calendar day that has trips in the current filter context.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Trips], DISTINCTCOUNT ( Trips[Pickup Date] ) )
+        format_string: '#,0'
+        display_folder: Volume
+  - name: total_miles
+    expression:
+      sql: SUM(trip_miles)
+    datatype: Decimal
+    description: Total metered distance in miles.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[Trip Miles] )
+        format_string: '#,0'
+        display_folder: Distance and Time
+  - name: avg_miles_per_trip
+    expression:
+      sql: SUM(trip_miles) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Average metered distance per trip, in miles.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Total Miles], [Trips] )
+        format_string: '#,0.00'
+        display_folder: Distance and Time
+  - name: trip_hours
+    expression:
+      sql: SUM(trip_minutes) / 60
+    datatype: Decimal
+    description: Total time with the meter engaged, in hours.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( SUM ( Trips[Trip Minutes] ), 60 )
+        format_string: '#,0'
+        display_folder: Distance and Time
+  - name: avg_trip_minutes
+    expression:
+      sql: SUM(trip_minutes) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Average time with the meter engaged per trip, in minutes.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( SUM ( Trips[Trip Minutes] ), [Trips] )
+        format_string: '#,0.0'
+        display_folder: Distance and Time
+  - name: avg_speed_mph
+    expression:
+      sql: (SUM(trip_miles) FILTER (WHERE trip_miles >= 0.1 AND trip_miles <= 200 AND trip_minutes >= 1 AND trip_minutes
+        <= 300) * 60) / NULLIF(SUM(trip_minutes) FILTER (WHERE trip_miles >= 0.1 AND trip_miles <= 200 AND trip_minutes
+        >= 1 AND trip_minutes <= 300), 0)
+    datatype: Decimal
+    description: Distance-weighted average speed in miles per hour, over plausible trips only (0.1 to 200 miles,
+      1 to 300 minutes) so meter errors do not distort it.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( DIVIDE ( SUM ( Trips[Trip Miles] ) * 60, SUM ( Trips[Trip Minutes] ) ), KEEPFILTERS ( Trips[Trip
+          Miles] >= 0.1 && Trips[Trip Miles] <= 200 ), KEEPFILTERS ( Trips[Trip Minutes] >= 1 && Trips[Trip Minutes]
+          <= 300 ) )
+        format_string: '#,0.0'
+        display_folder: Distance and Time
+  - name: fare_revenue
+    expression:
+      sql: SUM(fare_amount)
+    datatype: Decimal
+    description: Time-and-distance fare calculated by the meter, before extras, taxes, tolls and tips.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[Fare Amount] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Revenue
+  - name: tips
+    expression:
+      sql: SUM(tip_amount)
+    datatype: Decimal
+    description: Tips recorded on the trip. Only card tips are recorded; cash tips are not in the data.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[Tip Amount] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Revenue
+  - name: tolls
+    expression:
+      sql: SUM(tolls_amount)
+    datatype: Decimal
+    description: Bridge and tunnel tolls paid on the trip.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[Tolls Amount] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Revenue
+  - name: taxes_and_surcharges
+    expression:
+      sql: SUM(extra_amount) + SUM(mta_tax) + SUM(improvement_surcharge) + SUM(congestion_surcharge) + SUM(airport_fee)
+        + SUM(cbd_congestion_fee)
+    datatype: Decimal
+    description: Extras, MTA tax, improvement surcharge, NYS congestion surcharge, airport fee and the MTA congestion
+      relief zone (CBD) fee.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[Extra Amount] ) + SUM ( Trips[MTA Tax] ) + SUM ( Trips[Improvement Surcharge] ) + SUM (
+          Trips[Congestion Surcharge] ) + SUM ( Trips[Airport Fee] ) + SUM ( Trips[CBD Congestion Fee] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Revenue
+  - name: cbd_congestion_fees
+    expression:
+      sql: SUM(cbd_congestion_fee)
+    datatype: Decimal
+    description: MTA congestion relief zone (CBD) fees, charged from 5 January 2025.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[CBD Congestion Fee] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Revenue
+  - name: total_revenue
+    expression:
+      sql: SUM(total_amount)
+    datatype: Decimal
+    description: 'Total charged to passengers: fare, extras, taxes, surcharges, tolls and recorded tips. Excludes
+      cash tips. Refunds and voids appear as negative amounts.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: SUM ( Trips[Total Amount] )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Revenue
+  - name: avg_fare_per_trip
+    expression:
+      sql: SUM(fare_amount) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Average metered fare per trip.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Fare Revenue], [Trips] )
+        format_string: $#,0.00;($#,0.00);$#,0.00
+        display_folder: Revenue
+  - name: avg_revenue_per_trip
+    expression:
+      sql: SUM(total_amount) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Average total charged per trip.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Total Revenue], [Trips] )
+        format_string: $#,0.00;($#,0.00);$#,0.00
+        display_folder: Revenue
+  - name: fare_per_mile
+    expression:
+      sql: SUM(fare_amount) / NULLIF(SUM(trip_miles), 0)
+    datatype: Decimal
+    description: Metered fare per metered mile.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Fare Revenue], [Total Miles] )
+        format_string: $#,0.00;($#,0.00);$#,0.00
+        display_folder: Revenue
+  - name: card_trips
+    expression:
+      sql: COUNT(*) FILTER (WHERE payment_type_id = 1)
+    datatype: Decimal
+    description: Trips paid by credit card, the only payment type with recorded tips.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Trips], KEEPFILTERS ( 'Payment Type'[Payment Type ID] = 1 ) )
+        format_string: '#,0'
+        display_folder: Tipping
+  - name: card_payment_pct
+    expression:
+      sql: COUNT(*) FILTER (WHERE payment_type_id = 1) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Share of trips paid by credit card.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Card Trips], [Trips] )
+        format_string: 0.0%
+        display_folder: Tipping
+  - name: card_tips
+    expression:
+      sql: SUM(tip_amount) FILTER (WHERE payment_type_id = 1)
+    datatype: Decimal
+    description: Tips on credit card trips.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Tips], KEEPFILTERS ( 'Payment Type'[Payment Type ID] = 1 ) )
+        format_string: $#,0;($#,0);$#,0
+        display_folder: Tipping
+  - name: card_tip_rate_pct
+    expression:
+      sql: SUM(tip_amount) FILTER (WHERE payment_type_id = 1) / NULLIF(SUM(fare_amount) FILTER (WHERE payment_type_id
+        = 1), 0)
+    datatype: Decimal
+    description: 'Card tips as a share of the metered fare on card trips: the usual way to read tipping, since cash
+      tips are not recorded.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Card Tips], CALCULATE ( [Fare Revenue], KEEPFILTERS ( 'Payment Type'[Payment Type ID] = 1
+          ) ) )
+        format_string: 0.0%
+        display_folder: Tipping
+  - name: avg_tip_per_card_trip
+    expression:
+      sql: SUM(tip_amount) FILTER (WHERE payment_type_id = 1) / NULLIF(COUNT(*) FILTER (WHERE payment_type_id =
+        1), 0)
+    datatype: Decimal
+    description: Average tip per credit card trip.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Card Tips], [Card Trips] )
+        format_string: $#,0.00;($#,0.00);$#,0.00
+        display_folder: Tipping
+  - name: airport_pickups
+    expression:
+      sql: COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138))
+    datatype: Decimal
+    description: Trips picked up at JFK, LaGuardia or Newark airport (taxi zones 132, 138 and 1).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Trips], KEEPFILTERS ( 'Pickup Zone'[Pickup Location ID] IN { 1, 132, 138 } ) )
+        format_string: '#,0'
+        display_folder: Mix
+  - name: airport_pickup_pct
+    expression:
+      sql: COUNT(*) FILTER (WHERE pickup_location_id IN (1, 132, 138)) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Share of trips picked up at an airport.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [Airport Pickups], [Trips] )
+        format_string: 0.0%
+        display_folder: Mix
+  - name: cbd_zone_trips
+    expression:
+      sql: COUNT(*) FILTER (WHERE cbd_congestion_fee > 0)
+    datatype: Decimal
+    description: Trips charged the Manhattan congestion relief zone (CBD) fee.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Trips], KEEPFILTERS ( Trips[CBD Congestion Fee] > 0 ) )
+        format_string: '#,0'
+        display_folder: Mix
+  - name: cbd_zone_trip_pct
+    expression:
+      sql: COUNT(*) FILTER (WHERE cbd_congestion_fee > 0) / NULLIF(COUNT(*), 0)
+    datatype: Decimal
+    description: Share of trips charged the congestion relief zone (CBD) fee.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( [CBD Zone Trips], [Trips] )
+        format_string: 0.0%
+        display_folder: Mix
+- name: vendor
+  source: nyc_taxi.vendor
+  description: TPEP provider (technology vendor) that supplied the trip record, per the TLC data dictionary.
+  primary_key:
+  - vendor_id
+  fields:
+  - name: vendor_id
+    expression:
+      sql: vendor_id
+    datatype: Integer
+    description: TLC VendorID. Primary key, related to Trips[Vendor ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: vendor
+    expression:
+      sql: vendor
+    datatype: String
+    description: Provider name, for example Curb Mobility.
+relationships:
+- name: trips_to_date
+  from: trips
+  to: date
+  from_columns:
+  - pickup_date
+  to_columns:
+  - date
+- name: trips_to_time_of_day
+  from: trips
+  to: time_of_day
+  from_columns:
+  - pickup_hour
+  to_columns:
+  - hour
+- name: trips_to_pickup_zone
+  from: trips
+  to: pickup_zone
+  from_columns:
+  - pickup_location_id
+  to_columns:
+  - pickup_location_id
+- name: trips_to_dropoff_zone
+  from: trips
+  to: dropoff_zone
+  from_columns:
+  - dropoff_location_id
+  to_columns:
+  - dropoff_location_id
+- name: trips_to_vendor
+  from: trips
+  to: vendor
+  from_columns:
+  - vendor_id
+  to_columns:
+  - vendor_id
+- name: trips_to_rate_code
+  from: trips
+  to: rate_code
+  from_columns:
+  - rate_code_id
+  to_columns:
+  - rate_code_id
+- name: trips_to_payment_type
+  from: trips
+  to: payment_type
+  from_columns:
+  - payment_type_id
+  to_columns:
+  - payment_type_id
+metrics:
+- name: last_trip_date
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( MAX ( Trips[Pickup Date] ), REMOVEFILTERS () )
+  datatype: Date
+  description: 'Latest pickup date loaded, ignoring all filters. Stops time intelligence from projecting past the
+    data. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026
+    metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Helpers
+      is_hidden: true
+- name: trips_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Trip Date], CALCULATE ( [Trips], DATESYTD ( 'Date'[Date] )
+        ) )
+  datatype: Decimal
+  description: 'Trips from 1 January of the selected year to the end of the selected period. Blank after the last
+    loaded date. No OSSIE_SQL_2026 expression: `DATESYTD` shifts or accumulates dates through the Power BI date
+    table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time Intelligence\Trips
+- name: trips_py
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Trips], CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through Last
+        Trip Date] = TRUE ) )
+  datatype: Decimal
+  description: 'Trips in the same period one year earlier, limited to dates on or before the last loaded pickup
+    date, so a period that runs past the loaded data compares like for like. No OSSIE_SQL_2026 expression: `DATEADD`
+    shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions,
+    and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time Intelligence\Trips
+- name: trips_py_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Trips YTD], CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through Last
+        Trip Date] = TRUE ) )
+  datatype: Decimal
+  description: 'Year-to-date trips for the same period one year earlier. No OSSIE_SQL_2026 expression: `DATEADD`
+    shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions,
+    and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time Intelligence\Trips
+- name: trips_yoy
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR CurrentValue = [Trips] VAR PriorValue = [Trips PY] RETURN IF ( NOT ISBLANK ( CurrentValue
+        ) && NOT ISBLANK ( PriorValue ), CurrentValue - PriorValue )
+  datatype: Decimal
+  description: 'Change in trips against the same period one year earlier. Blank when either year has no data. No
+    OSSIE_SQL_2026 expression: Depends on `trips_py`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +#,0;-#,0;0
+      display_folder: Time Intelligence\Trips
+- name: trips_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Trips YoY], [Trips PY] )
+  datatype: Decimal
+  description: 'Percentage change in trips against the same period one year earlier. No OSSIE_SQL_2026 expression:
+    Depends on `trips_yoy`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time Intelligence\Trips
+- name: trips_ytd_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Trips YTD] - [Trips PY YTD], [Trips PY YTD] )
+  datatype: Decimal
+  description: 'Percentage change in year-to-date trips against the same span one year earlier. No OSSIE_SQL_2026
+    expression: Depends on `trips_ytd`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time Intelligence\Trips
+- name: total_revenue_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Trip Date], CALCULATE ( [Total Revenue], DATESYTD ( 'Date'[Date]
+        ) ) )
+  datatype: Decimal
+  description: 'Total revenue from 1 January of the selected year to the end of the selected period. Blank after
+    the last loaded date. No OSSIE_SQL_2026 expression: `DATESYTD` shifts or accumulates dates through the Power
+    BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date
+    filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time Intelligence\Revenue
+- name: total_revenue_py
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Total Revenue], CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through
+        Last Trip Date] = TRUE ) )
+  datatype: Decimal
+  description: 'Total revenue in the same period one year earlier, limited to dates on or before the last loaded
+    pickup date. No OSSIE_SQL_2026 expression: `DATEADD` shifts or accumulates dates through the Power BI date table.
+    OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time Intelligence\Revenue
+- name: total_revenue_py_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Total Revenue YTD], CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through
+        Last Trip Date] = TRUE ) )
+  datatype: Decimal
+  description: 'Year-to-date total revenue for the same period one year earlier. No OSSIE_SQL_2026 expression: `DATEADD`
+    shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions,
+    and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time Intelligence\Revenue
+- name: total_revenue_yoy
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR CurrentValue = [Total Revenue] VAR PriorValue = [Total Revenue PY] RETURN IF ( NOT ISBLANK
+        ( CurrentValue ) && NOT ISBLANK ( PriorValue ), CurrentValue - PriorValue )
+  datatype: Decimal
+  description: 'Change in total revenue against the same period one year earlier. Blank when either year has no
+    data. No OSSIE_SQL_2026 expression: Depends on `total_revenue_py`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +$#,0;-$#,0;$0
+      display_folder: Time Intelligence\Revenue
+- name: total_revenue_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Total Revenue YoY], [Total Revenue PY] )
+  datatype: Decimal
+  description: 'Percentage change in total revenue against the same period one year earlier. No OSSIE_SQL_2026 expression:
+    Depends on `total_revenue_yoy`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time Intelligence\Revenue
+- name: total_revenue_ytd_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Total Revenue YTD] - [Total Revenue PY YTD], [Total Revenue PY YTD] )
+  datatype: Decimal
+  description: 'Percentage change in year-to-date total revenue against the same span one year earlier. No OSSIE_SQL_2026
+    expression: Depends on `total_revenue_ytd`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time Intelligence\Revenue
+- name: avg_fare_per_trip_py
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Avg Fare per Trip], CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Through
+        Last Trip Date] = TRUE ) )
+  datatype: Decimal
+  description: 'Average fare per trip in the same period one year earlier. No OSSIE_SQL_2026 expression: `DATEADD`
+    shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions,
+    and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0.00;($#,0.00);$#,0.00
+      display_folder: Time Intelligence\Fares
+- name: avg_fare_per_trip_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR PriorValue = [Avg Fare per Trip PY] RETURN IF ( NOT ISBLANK ( PriorValue ), DIVIDE ( [Avg
+        Fare per Trip] - PriorValue, PriorValue ) )
+  datatype: Decimal
+  description: 'Percentage change in the average fare per trip against the same period one year earlier. No OSSIE_SQL_2026
+    expression: Depends on `avg_fare_per_trip_py`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time Intelligence\Fares

@@ -1,0 +1,711 @@
+# Apache Ossie Core Metadata Specification twin of models/census-retail (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: census_retail
+datasets:
+- name: adjustment
+  source: census_retail.adjustment
+  description: 'The two series Census publishes for every month: Not seasonally adjusted (what was sold) and Seasonally
+    adjusted (adjusted for seasonal variation, holiday and trading-day differences, not for price changes). They
+    are the same sales measured twice, so the measures read one at a time: with no selection they read Not seasonally
+    adjusted, with both selected they are blank.'
+  primary_key:
+  - adjustment
+  fields:
+  - name: adjustment
+    expression:
+      sql: adjustment
+    datatype: String
+    description: Not seasonally adjusted or Seasonally adjusted. Primary key, related to 'Fact Retail Sales'[Adjustment].
+      Sorted not adjusted first.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Adjustment Sort
+  - name: adjustment_sort
+    expression:
+      sql: adjustment_sort
+    datatype: Integer
+    description: 'Sort order for Adjustment: 1 Not seasonally adjusted, 2 Seasonally adjusted (the workbook''s order).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: date
+  source: census_retail.date
+  description: Calendar dimension, one row per day from CalendarStart (1 January 1992) to CalendarEnd (31 December
+    of the current year). Marked as the model's date table; drives year-to-date and prior-year measures. Census
+    retail figures are monthly, so facts land on the first day of each month.
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Retail Sales'[Date] (the first of each month).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-09. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202609.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month, the date the Census monthly figures are keyed to.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: fact_retail_sales
+  source: census_retail.fact_retail_sales
+  description: 'Fact table: U.S. retail and food services sales from the Census Bureau''s Monthly Retail Trade Survey
+    (mrtssales92-present.xlsx). Grain: kind of business x month x adjustment (not seasonally adjusted, seasonally
+    adjusted), U.S. total only. The kind lines nest (441 holds 4411, which holds 44111) and include totals, so summing
+    every row multiplies sales: Sales adds only the thirteen lines that partition the total, and the Line measures
+    read one published line at a time. Every column is hidden; analysis goes through the measures and the Date,
+    Kind and Adjustment dimensions.'
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the figures are for. Foreign key to 'Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: kind_key
+    expression:
+      sql: kind_key
+    datatype: String
+    description: 'Kind of business: the NAICS code where the line has one (441, 4541, 4411,4412), else the published
+      name of the total or "excl." line. Foreign key to Kind[Kind Key].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: adjustment
+    expression:
+      sql: adjustment
+    datatype: String
+    description: Not seasonally adjusted or Seasonally adjusted, from the workbook section the row sits in. Foreign
+      key to Adjustment[Adjustment].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: include_in_total
+    expression:
+      sql: include_in_total
+    datatype: Boolean
+    description: True only for the thirteen three-digit lines (441-448, 451-454, 722) that add to the published
+      total with no remainder. The Sales measure adds only these rows.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: sales_usd
+    expression:
+      sql: sales_usd
+    datatype: Decimal
+    description: Sales in dollars (Census's millions of dollars x 1,000,000). Blank where the cell is (S) suppressed
+      or (NA) not available.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \$#,0;(\$#,0);\$#,0
+  - name: preliminary
+    expression:
+      sql: preliminary
+    datatype: Boolean
+    description: 'True when the month header carries (p): a preliminary estimate, revised in the next release.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: cell_status
+    expression:
+      sql: cell_status
+    datatype: String
+    description: 'What the workbook cell held: Published (a number), Suppressed ((S)) or Not available ((NA)).'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  metrics:
+  - name: kinds_in_total
+    expression:
+      sql: COUNT(DISTINCT kind_key) FILTER (WHERE include_in_total = TRUE AND cell_status = 'Published')
+    datatype: Decimal
+    description: 'Kind lines counted in Sales that have a published figure in context. Should be 13 for any month:
+      a completeness check on the double-counting guard.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( DISTINCTCOUNT ( 'Fact Retail Sales'[Kind Key] ), KEEPFILTERS ( 'Fact Retail Sales'[Include
+          In Total] = TRUE () ), KEEPFILTERS ( 'Fact Retail Sales'[Cell Status] = "Published" ) )
+        format_string: '0'
+        display_folder: Audit
+  - name: suppressed_cells
+    expression:
+      sql: COUNT(*) FILTER (WHERE cell_status = 'Suppressed')
+    datatype: Decimal
+    description: 'Cells Census withheld, marked (S): the estimate did not meet publication standards. Stored blank,
+      never zero.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( COUNTROWS ( 'Fact Retail Sales' ), KEEPFILTERS ( 'Fact Retail Sales'[Cell Status] = "Suppressed"
+          ) )
+        format_string: '#,0'
+        display_folder: Audit
+  - name: not_available_cells
+    expression:
+      sql: COUNT(*) FILTER (WHERE cell_status = 'Not available')
+    datatype: Decimal
+    description: Cells Census marked (NA), not available (mostly seasonally adjusted lines that are not adjusted).
+      Stored blank, never zero.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( COUNTROWS ( 'Fact Retail Sales' ), KEEPFILTERS ( 'Fact Retail Sales'[Cell Status] = "Not
+          available" ) )
+        format_string: '#,0'
+        display_folder: Audit
+  - name: months_in_scope
+    expression:
+      sql: COUNT(DISTINCT date)
+    datatype: Integer
+    description: Number of distinct months with data in the current filter context. A full year has 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DISTINCTCOUNT ( 'Fact Retail Sales'[Date] )
+        format_string: '0'
+        display_folder: Audit
+- name: kind
+  source: census_retail.kind
+  description: 'Kind of business: every line the Monthly Retail Trade workbook publishes, 64 in the November 2026
+    file. NAICS lines nest (441 > 4411 > 44111) and the uncoded lines are totals or "excl." aggregates, so only
+    the thirteen lines with Include In Total add up; Parent Code and Level describe the nesting. Built from the
+    workbook itself, so labels follow Census.'
+  primary_key:
+  - kind_key
+  fields:
+  - name: kind_key
+    expression:
+      sql: kind_key
+    datatype: String
+    description: 'Key of the line: the NAICS code where there is one (441, 4541, 4411,4412, 722513, 722514, 722515),
+      else the published name of an uncoded total or "excl." line. Primary key, related to ''Fact Retail Sales''[Kind
+      Key].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: kind
+    expression:
+      sql: kind
+    datatype: String
+    description: Code and name, for example "447 Gasoline stations", or the name alone for the uncoded totals. Unique;
+      the column to put on visuals. Sorted in the workbook's order.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Kind Sort
+  - name: kind_code
+    expression:
+      sql: kind_code
+    datatype: String
+    description: NAICS code or codes as Census prints them, for example 441 or 4411,4412. Blank on the total and
+      "excl." lines.
+  - name: kind_name
+    expression:
+      sql: kind_name
+    datatype: String
+    description: 'The published label, from the newest year''s not seasonally adjusted section (Census''s wording
+      drifts slightly between sections and years). Not unique: 4522 and 45221 are both "Department stores".'
+  - name: kind_sort
+    expression:
+      sql: kind_sort
+    datatype: Integer
+    description: 'Line order in the workbook (newest year, not seasonally adjusted section): the total lines first,
+      then 441 down to 722. Sort key for Kind.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: kind_type
+    expression:
+      sql: kind_type
+    datatype: String
+    description: Total or aggregate (uncoded total and "excl." lines, and GAFO), Combined codes (a line spanning
+      several codes, such as 442,443) or NAICS code.
+  - name: include_in_total
+    expression:
+      sql: include_in_total
+    datatype: Boolean
+    description: True for the thirteen three-digit lines (441-448, 451-454, 722) that partition "Retail and food
+      services sales, total" with no remainder; the Sales measure adds only these.
+  - name: parent_code
+    expression:
+      sql: parent_code
+    datatype: String
+    description: 'Kind Key of the line this one nests in: the longest shorter prefix of its (first) code that the
+      workbook publishes, for example 44111 > 4411, 4541 > 454, 443141 > 443. Blank for three-digit lines and uncoded
+      lines.'
+  - name: parent_kind
+    expression:
+      sql: parent_kind
+    datatype: String
+    description: Code and name of the parent line, for example "454 Nonstore retailers". Blank where there is no
+      parent.
+  - name: level
+    expression:
+      sql: level
+    datatype: Integer
+    description: 'Digits in the line''s (first) NAICS code: 3 for subsectors such as 441, up to 6; 0 for the uncoded
+      total and "excl." lines.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+relationships:
+- name: fact_retail_sales_to_date
+  from: fact_retail_sales
+  to: date
+  from_columns:
+  - date
+  to_columns:
+  - date
+- name: fact_retail_sales_to_kind
+  from: fact_retail_sales
+  to: kind
+  from_columns:
+  - kind_key
+  to_columns:
+  - kind_key
+- name: fact_retail_sales_to_adjustment
+  from: fact_retail_sales
+  to: adjustment
+  from_columns:
+  - adjustment
+  to_columns:
+  - adjustment
+metrics:
+- name: sales_in_adjustment
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: SWITCH ( TRUE (), HASONEVALUE ( Adjustment[Adjustment] ), SUM ( 'Fact Retail Sales'[Sales USD]
+        ), NOT ISFILTERED ( Adjustment ), CALCULATE ( SUM ( 'Fact Retail Sales'[Sales USD] ), Adjustment[Adjustment]
+        = "Not seasonally adjusted" ) )
+  datatype: Decimal
+  description: 'Sales in dollars for the adjustment in context, summed over whatever kind lines are in context.
+    A building block only: it does not guard against nested lines (Sales and Line sales do). With no adjustment
+    filter it reads the not seasonally adjusted series; with both adjustments selected it is blank, because the
+    two series are the same sales measured twice. No OSSIE_SQL_2026 expression: returns the one adjustment in the
+    filters, or not seasonally adjusted when none is picked, and blank when both are. `HASONEVALUE` and `ISFILTERED`
+    have no Ossie form. `SUM(sales_usd) FILTER (WHERE adjustment = ''Not seasonally adjusted'')` would be right
+    only for the default view.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Audit
+      is_hidden: true
+- name: sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Sales in adjustment], KEEPFILTERS ( 'Fact Retail Sales'[Include In Total] = TRUE
+        () ) )
+  datatype: Decimal
+  description: 'Retail and food services sales in dollars, adding only the thirteen kind lines that partition the
+    published total (441-448, 451-454, 722). With no kind filter it equals Census''s "Retail and food services sales,
+    total"; filtered to one of the thirteen it is that line; filtered to a line outside them (a subsector, a total
+    or an "excl." line) it is blank, so use Line sales there. Not seasonally adjusted unless an adjustment is selected.
+    No OSSIE_SQL_2026 expression: Depends on `sales_in_adjustment`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Sales
+- name: sales_millions
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Sales], 1000000 )
+  datatype: Decimal
+  description: 'Sales in millions of dollars, the unit Census prints. No OSSIE_SQL_2026 expression: Depends on `sales`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Sales
+- name: line_sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( HASONEVALUE ( Kind[Kind Key] ), [Sales in adjustment] )
+  datatype: Decimal
+  description: 'Sales of one published kind line, in dollars, exactly as Census prints it (children are not rolled
+    up; the line already includes them). Blank unless exactly one kind is in context, so nested lines are never
+    added together. This is how the total line, the "excl." lines and subsectors such as 4541 are read. No OSSIE_SQL_2026
+    expression: `HASONEVALUE` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter
+    context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Line
+- name: line_sales_millions
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Line sales], 1000000 )
+  datatype: Decimal
+  description: 'Line sales in millions of dollars, the unit Census prints. No OSSIE_SQL_2026 expression: Depends
+    on `line_sales`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Line
+- name: share_of_retail_and_food_services
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Line sales], CALCULATE ( [Line sales], REMOVEFILTERS ( Kind ), Kind[Kind Key] = "Retail
+        and food services sales, total" ) )
+  datatype: Decimal
+  description: 'The selected kind line as a share of "Retail and food services sales, total" in the same month(s)
+    and adjustment. Kind filters are removed for the denominator; date and adjustment filters stay. No OSSIE_SQL_2026
+    expression: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter
+    context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Mix
+- name: share_of_parent
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR ParentCode = SELECTEDVALUE ( Kind[Parent Code] ) RETURN IF ( NOT ISBLANK ( ParentCode ), DIVIDE
+        ( [Line sales], CALCULATE ( [Line sales], REMOVEFILTERS ( Kind ), Kind[Kind Key] = ParentCode ) ) )
+  datatype: Decimal
+  description: 'The selected kind line as a share of its parent line (the longest shorter NAICS code published,
+    for example 4541 in 454), same month(s) and adjustment. Blank for lines without a parent (the three-digit lines
+    and the uncoded totals). No OSSIE_SQL_2026 expression: `SELECTEDVALUE` reads or removes what the report has
+    filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Mix
+- name: sales_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Sales], 'Date'[Date] ) )
+  datatype: Decimal
+  description: 'Sales year to date: January through the selected month of the same calendar year. Blank after the
+    last month in the workbook. No OSSIE_SQL_2026 expression: `TOTALYTD` shifts or accumulates dates through the
+    Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s
+    date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time
+- name: sales_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = EOMONTH ( [Last Data Date], 0 ) RETURN CALCULATE ( [Sales], SAMEPERIODLASTYEAR (
+        FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Sales in the same period one year earlier, over the same months that have data now: for a year still
+    in progress (2026 through September) it is the prior year''s January to September, not the whole prior year,
+    so Sales YoY % compares like with like. No OSSIE_SQL_2026 expression: `EOMONTH` shifts or accumulates dates
+    through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move
+    the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time
+- name: sales_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Sales] ), DIVIDE ( [Sales] - [Sales prior year], [Sales prior year] ) )
+  datatype: Decimal
+  description: 'Change in sales against the same period a year earlier, as a percentage of the prior year. No OSSIE_SQL_2026
+    expression: Depends on `sales`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: sales_prior_month
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Sales], DATEADD ( 'Date'[Date], -1, MONTH ) )
+  datatype: Decimal
+  description: 'Sales in the month before the selected period (shifted one month back). No OSSIE_SQL_2026 expression:
+    `DATEADD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence
+    functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time
+- name: sales_month_to_month_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Sales] ), DIVIDE ( [Sales] - [Sales prior month], [Sales prior month] ) )
+  datatype: Decimal
+  description: 'Change in sales against the prior month, as a percentage of the prior month. Read it on seasonally
+    adjusted sales; not adjusted month-to-month changes are mostly the calendar. No OSSIE_SQL_2026 expression: Depends
+    on `sales`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: line_sales_ytd
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( MIN ( 'Date'[Date] ) <= [Last Data Date], TOTALYTD ( [Line sales], 'Date'[Date] ) )
+  datatype: Decimal
+  description: 'Line sales year to date for the one selected kind line: January through the selected month. Blank
+    after the last month in the workbook. No OSSIE_SQL_2026 expression: `TOTALYTD` shifts or accumulates dates through
+    the Power BI date table. OSSIE_SQL_2026 has no time-intelligence functions, and a metric can''t move the query''s
+    date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time
+- name: line_sales_prior_year
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR LastDay = EOMONTH ( [Last Data Date], 0 ) RETURN CALCULATE ( [Line sales], SAMEPERIODLASTYEAR
+        ( FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastDay ) ) )
+  datatype: Decimal
+  description: 'Line sales for the one selected kind line in the same period one year earlier, over the same months
+    that have data now (a year in progress compares with the same months of the prior year). No OSSIE_SQL_2026 expression:
+    `EOMONTH` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence
+    functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Time
+- name: line_sales_yoy_pct
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( NOT ISBLANK ( [Line sales] ), DIVIDE ( [Line sales] - [Line sales prior year], [Line sales
+        prior year] ) )
+  datatype: Decimal
+  description: 'Change in the selected kind line''s sales against the same period a year earlier. No OSSIE_SQL_2026
+    expression: Depends on `line_sales`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +0.0%;-0.0%;0.0%
+      display_folder: Time
+- name: not_adjusted_sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( IF ( HASONEVALUE ( Kind[Kind Key] ), [Line sales], [Sales] ), Adjustment[Adjustment]
+        = "Not seasonally adjusted" )
+  datatype: Decimal
+  description: 'Sales from the not seasonally adjusted series, whatever adjustment is selected: what was actually
+    sold in the month. With one kind line in context it reads that line (Line sales), so subsectors and totals such
+    as 4541 work; otherwise it is Sales (the thirteen additive lines). No OSSIE_SQL_2026 expression: `HASONEVALUE`
+    reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS,
+    ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Adjustment
+- name: seasonally_adjusted_sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( IF ( HASONEVALUE ( Kind[Kind Key] ), [Line sales], [Sales] ), Adjustment[Adjustment]
+        = "Seasonally adjusted" )
+  datatype: Decimal
+  description: 'Sales from the seasonally adjusted series (adjusted for seasonal variation, holiday and trading-day
+    differences; not adjusted for price changes), whatever adjustment is selected. With one kind line in context
+    it reads that line (Line sales), so subsectors and totals such as 4541 work; otherwise it is Sales (the thirteen
+    additive lines). Blank for lines Census does not adjust, marked (NA). No OSSIE_SQL_2026 expression: `HASONEVALUE`
+    reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS,
+    ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Adjustment
+- name: seasonal_factor
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Not adjusted sales], [Seasonally adjusted sales] )
+  datatype: Decimal
+  description: 'Not adjusted sales divided by seasonally adjusted sales, for the total or for any one kind line
+    in context: above 1 when the month sells more than its adjusted level (December), below 1 when less. The ratio
+    of the two published series, not Census''s official factor files. No OSSIE_SQL_2026 expression: Depends on `not_adjusted_sales`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.000'
+      display_folder: Adjustment
+- name: preliminary_sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Sales], KEEPFILTERS ( 'Fact Retail Sales'[Preliminary] = TRUE () ) )
+  datatype: Decimal
+  description: 'Sales in months Census still marks preliminary, (p) in the month header; revised in the next release.
+    No OSSIE_SQL_2026 expression: Depends on `sales`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: $#,0;($#,0);$#,0
+      display_folder: Audit
+- name: last_data_date
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( MAX ( 'Fact Retail Sales'[Date] ), REMOVEFILTERS () )
+  datatype: Date
+  description: 'First day of the latest month in the workbook, ignoring filters. Stops year-to-date measures at
+    the data. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads or removes what the report has filtered. OSSIE_SQL_2026
+    metrics have no filter context: no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: yyyy-mm-dd
+      display_folder: Audit
+      is_hidden: true

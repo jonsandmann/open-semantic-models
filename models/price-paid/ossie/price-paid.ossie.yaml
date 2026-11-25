@@ -1,0 +1,729 @@
+# Apache Ossie Core Metadata Specification twin of models/price-paid (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: price_paid
+datasets:
+- name: build
+  source: price_paid.build
+  description: Whether the property was newly built at the time of the sale (Land Registry's old/new flag). Most
+    new-build sales are registered months after they complete, so a recent month in one update file holds few of
+    them.
+  primary_key:
+  - build
+  fields:
+  - name: build
+    expression:
+      sql: build
+    datatype: String
+    description: New build (flag Y) or Established (flag N). Primary key, related to 'Fact Sale'[Build].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Build Sort
+  - name: build_sort
+    expression:
+      sql: build_sort
+    datatype: Integer
+    description: 'Sort order for Build: 1 New build, 2 Established.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: category
+  source: price_paid.category
+  description: Price Paid Data category. Standard (A) is a single residential property sold for value, the one to
+    use for house prices. Additional (B) covers transfers under a power of sale (repossessions), buy-to-lets identified
+    by a mortgage, transfers to non-private individuals and sales of property typed Other; the price measures leave
+    it out.
+  primary_key:
+  - category
+  fields:
+  - name: category
+    expression:
+      sql: category
+    datatype: String
+    description: Standard or Additional. Primary key, related to 'Fact Sale'[Category].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Category Sort
+  - name: category_code
+    expression:
+      sql: category_code
+    datatype: String
+    description: 'Land Registry''s code: A Standard, B Additional.'
+  - name: category_sort
+    expression:
+      sql: category_sort
+    datatype: Integer
+    description: 'Sort order for Category: 1 Standard, 2 Additional.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: date
+  source: price_paid.date
+  description: Calendar dimension, one row per day from CalendarStart (1 January 1995, the first year in Price Paid)
+    to CalendarEnd (31 December of the current year). Marked as the model's date table; sales land on their transfer
+    date (the day the sale completed).
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to 'Fact Sale'[Transfer Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month the date falls in.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: duration
+  source: price_paid.duration
+  description: 'Tenure: Freehold or Leasehold, plus Unknown for the few historic records Land Registry could not
+    classify.'
+  primary_key:
+  - duration_code
+  fields:
+  - name: duration_code
+    expression:
+      sql: duration_code
+    datatype: String
+    description: 'Land Registry''s code: F, L or U. Primary key, related to ''Fact Sale''[Duration Code].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: duration
+    expression:
+      sql: duration
+    datatype: String
+    description: Freehold, Leasehold or Unknown. Leases of seven years or less are not in Price Paid.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Duration Sort
+  - name: duration_sort
+    expression:
+      sql: duration_sort
+    datatype: Integer
+    description: Sort order for Duration, 1 to 3.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: fact_sale
+  source: price_paid.fact_sale
+  description: 'Fact table: HM Land Registry Price Paid, one row per transaction id in the monthly update file (98,103
+    rows in the 28 Oct 2026 file, transfers dated 6 Jan 1995 to 30 Sep 2026). The file is the month''s additions,
+    changes and deletions, not every sale that completed in a month. No address-level field is loaded: no postcode,
+    PAON, SAON, street or locality. Every column is hidden; analysis goes through the measures and the dimensions.
+    Contains HM Land Registry data © Crown copyright and database right 2026. This data is licensed under the Open
+    Government Licence v3.0.'
+  fields:
+  - name: transaction_id
+    expression:
+      sql: transaction_id
+    datatype: String
+    description: Land Registry's unique identifier for the transaction, a GUID in braces. One row per id in a monthly
+      file; a later file can repeat an id as a change or a delete.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: transfer_date
+    expression:
+      sql: transfer_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Date of transfer on the deed (the sale completed). Foreign key to 'Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: price_gbp
+    expression:
+      sql: price_gbp
+    datatype: Integer
+    description: Price paid in whole pounds, as stated on the transfer deed. Read through the price measures; never
+      summed as a count.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: \£#,0
+  - name: property_type_code
+    expression:
+      sql: property_type_code
+    datatype: String
+    description: Property type code D, S, T, F or O. Foreign key to 'Property Type'[Property Type Code].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: duration_code
+    expression:
+      sql: duration_code
+    datatype: String
+    description: Tenure code F, L or U. Foreign key to Duration[Duration Code].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: build
+    expression:
+      sql: build
+    datatype: String
+    description: New build or Established, from the old/new flag. Foreign key to Build[Build].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: category
+    expression:
+      sql: category
+    datatype: String
+    description: Standard or Additional, from the PPD category type. Foreign key to Category[Category].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: record_status
+    expression:
+      sql: record_status
+    datatype: String
+    description: Added, Changed or Deleted, from the record status. Foreign key to 'Record Status'[Record Status].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: is_standard_sale
+    expression:
+      sql: is_standard_sale
+    datatype: Boolean
+    description: True for a standard transfer (category A) that is not deleted. Every sales and price measure filters
+      on it.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: TRUE"";""TRUE"";""FALSE
+  - name: location_key
+    expression:
+      sql: location_key
+    datatype: String
+    description: District and town joined with "|". Foreign key to Location[Location Key].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  metrics:
+  - name: sales
+    expression:
+      sql: COUNT(*) FILTER (WHERE is_standard_sale = TRUE)
+    datatype: Decimal
+    description: 'Standard Price Paid transfers (category A) that the file does not delete: the sales count every
+      price measure is built on.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( COUNTROWS ( 'Fact Sale' ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () ) )
+        format_string: '#,0'
+        display_folder: Volume
+  - name: all_records
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: 'Every record in the filter context: standard and additional, added, changed and deleted.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( 'Fact Sale' )
+        format_string: '#,0'
+        display_folder: Audit
+  - name: deleted_records
+    expression:
+      sql: COUNT(*) FILTER (WHERE record_status = 'Deleted')
+    datatype: Decimal
+    description: Records the file deletes. A delete withdraws an earlier record and is not a sale.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [All records], KEEPFILTERS ( 'Record Status'[Record Status] = "Deleted" ) )
+        format_string: '#,0'
+        display_folder: Audit
+  - name: additional_transfers
+    expression:
+      sql: COUNT(*) FILTER (WHERE category = 'Additional' AND record_status <> 'Deleted')
+    datatype: Decimal
+    description: 'Additional Price Paid transfers (category B: repossessions, buy-to-lets, non-private buyers, property
+      typed Other) that are not deleted. Kept out of Sales and every price measure.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [All records], KEEPFILTERS ( Category[Category] = "Additional" ), KEEPFILTERS ( 'Record
+          Status'[Record Status] <> "Deleted" ) )
+        format_string: '#,0'
+        display_folder: Audit
+  - name: median_price
+    expression:
+      sql: MEDIAN(price_gbp) FILTER (WHERE is_standard_sale = TRUE)
+    datatype: Decimal
+    description: Median price paid over standard sales, the headline typical price. A few very high sales pull the
+      mean up; the median does not move with them.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( MEDIAN ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE ()
+          ) )
+        format_string: \£#,0
+        display_folder: Price
+  - name: mean_price
+    expression:
+      sql: AVG(price_gbp) FILTER (WHERE is_standard_sale = TRUE)
+    datatype: Decimal
+    description: Mean (average) price paid over standard sales. Higher than the median because of a few very high
+      sales; label it as the mean.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( AVERAGE ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE
+          () ) )
+        format_string: \£#,0
+        display_folder: Price
+  - name: total_consideration
+    expression:
+      sql: SUM(price_gbp) FILTER (WHERE is_standard_sale = TRUE)
+    datatype: Decimal
+    description: 'Sum of prices paid over standard sales: the money that changed hands, not a typical price.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( SUM ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () )
+          )
+        format_string: \£#,0
+        display_folder: Price
+  - name: lowest_price
+    expression:
+      sql: MIN(price_gbp) FILTER (WHERE is_standard_sale = TRUE)
+    datatype: Decimal
+    description: Lowest price paid in a standard sale.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( MIN ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () )
+          )
+        format_string: \£#,0
+        display_folder: Price
+  - name: highest_price
+    expression:
+      sql: MAX(price_gbp) FILTER (WHERE is_standard_sale = TRUE)
+    datatype: Decimal
+    description: Highest price paid in a standard sale. The model holds no address, so the sale behind it cannot
+      be pinned to a home.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( MAX ( 'Fact Sale'[Price GBP] ), KEEPFILTERS ( 'Fact Sale'[Is Standard Sale] = TRUE () )
+          )
+        format_string: \£#,0
+        display_folder: Price
+  - name: freehold_share
+    expression:
+      sql: COUNT(*) FILTER (WHERE duration_code = 'F' AND is_standard_sale = TRUE) / NULLIF(COUNT(*) FILTER (WHERE
+        is_standard_sale = TRUE), 0)
+    datatype: Decimal
+    description: Freehold standard sales as a share of standard sales in the filter context.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: DIVIDE ( CALCULATE ( [Sales], KEEPFILTERS ( Duration[Duration Code] = "F" ) ), [Sales] )
+        format_string: 0.0%
+        display_folder: Mix
+  - name: new_build_sales
+    expression:
+      sql: COUNT(*) FILTER (WHERE build = 'New build' AND is_standard_sale = TRUE)
+    datatype: Decimal
+    description: Standard sales of newly built property. Most new-build sales are registered months after completion,
+      so a recent month in one update file holds few of them; do not read it as the new-build market.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Sales], KEEPFILTERS ( Build[Build] = "New build" ) )
+        format_string: '#,0'
+        display_folder: Mix
+  - name: sales_under_250_000
+    expression:
+      sql: COUNT(*) FILTER (WHERE price_gbp < 250000 AND is_standard_sale = TRUE)
+    datatype: Decimal
+    description: Standard sales at a price under £250,000.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Sales], KEEPFILTERS ( 'Fact Sale'[Price GBP] < 250000 ) )
+        format_string: '#,0'
+        display_folder: Mix
+  - name: sales_of_1_million_or_more
+    expression:
+      sql: COUNT(*) FILTER (WHERE price_gbp >= 1000000 AND is_standard_sale = TRUE)
+    datatype: Decimal
+    description: Standard sales at a price of £1,000,000 or more.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( [Sales], KEEPFILTERS ( 'Fact Sale'[Price GBP] >= 1000000 ) )
+        format_string: '#,0'
+        display_folder: Mix
+- name: location
+  source: price_paid.location
+  description: 'Geography, one row per town within a local authority district, as Land Registry publishes them (upper
+    case). Town, district and county only: no address-level field is in the model. A district sits in exactly one
+    county (checked: 320 districts, 114 counties and unitary authorities in the 28 Oct 2026 file). England and Wales
+    only; Price Paid does not cover Scotland or Northern Ireland, and the file carries no region.'
+  primary_key:
+  - location_key
+  fields:
+  - name: location_key
+    expression:
+      sql: location_key
+    datatype: String
+    description: District and town joined with "|", for example "BRISTOL|BRISTOL". Primary key, related to 'Fact
+      Sale'[Location Key]. A town name alone is not unique (one town spans several districts).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: town
+    expression:
+      sql: town
+    datatype: String
+    description: 'Post town as published, for example BRISTOL. Not unique on its own: read it with District or County.'
+  - name: district
+    expression:
+      sql: district
+    datatype: String
+    description: Local authority district as published, for example CITY OF BRISTOL.
+  - name: county
+    expression:
+      sql: county
+    datatype: String
+    description: County, metropolitan county or unitary authority as published, for example GREATER LONDON or SURREY.
+- name: property_type
+  source: price_paid.property_type
+  description: Land Registry's five property types. Other (O) covers property that is not one of the four house
+    and flat types and appears only on additional (category B) transfers, so standard sales never show it.
+  primary_key:
+  - property_type_code
+  fields:
+  - name: property_type_code
+    expression:
+      sql: property_type_code
+    datatype: String
+    description: 'Land Registry''s code: D, S, T, F or O. Primary key, related to ''Fact Sale''[Property Type Code].'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: property_type
+    expression:
+      sql: property_type
+    datatype: String
+    description: Detached, Semi-detached, Terraced, Flat or maisonette, Other. Sorted in that order.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Property Type Sort
+  - name: property_type_sort
+    expression:
+      sql: property_type_sort
+    datatype: Integer
+    description: Sort order for Property Type, 1 to 5.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: record_status
+  source: price_paid.record_status
+  description: 'What the monthly update file does to each record: Added, Changed or Deleted. A delete withdraws
+    an earlier record and is not a sale; the sales and price measures leave deletes out.'
+  primary_key:
+  - record_status
+  fields:
+  - name: record_status
+    expression:
+      sql: record_status
+    datatype: String
+    description: Added (A), Changed (C), Deleted (D), or Other for an unrecognised code. Primary key, related to
+      'Fact Sale'[Record Status].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Record Status Sort
+  - name: record_status_sort
+    expression:
+      sql: record_status_sort
+    datatype: Integer
+    description: Sort order for Record Status, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+relationships:
+- name: fact_sale_to_date
+  from: fact_sale
+  to: date
+  from_columns:
+  - transfer_date
+  to_columns:
+  - date
+- name: fact_sale_to_location
+  from: fact_sale
+  to: location
+  from_columns:
+  - location_key
+  to_columns:
+  - location_key
+- name: fact_sale_to_property_type
+  from: fact_sale
+  to: property_type
+  from_columns:
+  - property_type_code
+  to_columns:
+  - property_type_code
+- name: fact_sale_to_duration
+  from: fact_sale
+  to: duration
+  from_columns:
+  - duration_code
+  to_columns:
+  - duration_code
+- name: fact_sale_to_build
+  from: fact_sale
+  to: build
+  from_columns:
+  - build
+  to_columns:
+  - build
+- name: fact_sale_to_category
+  from: fact_sale
+  to: category
+  from_columns:
+  - category
+  to_columns:
+  - category
+- name: fact_sale_to_record_status
+  from: fact_sale
+  to: record_status
+  from_columns:
+  - record_status
+  to_columns:
+  - record_status
+metrics:
+- name: share_of_sales
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Sales], CALCULATE ( [Sales], REMOVEFILTERS ( Location ), REMOVEFILTERS ( 'Property Type'
+        ), REMOVEFILTERS ( Duration ), REMOVEFILTERS ( Build ) ) )
+  datatype: Decimal
+  description: 'Sales in the filter context as a share of all sales in the same dates, across every location, property
+    type, tenure and build. Date, category and record status filters stay. No OSSIE_SQL_2026 expression: `REMOVEFILTERS`
+    reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS,
+    ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Mix
+- name: share_of_consideration
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Total consideration], CALCULATE ( [Total consideration], REMOVEFILTERS ( Location ),
+        REMOVEFILTERS ( 'Property Type' ), REMOVEFILTERS ( Duration ), REMOVEFILTERS ( Build ) ) )
+  datatype: Decimal
+  description: 'Total consideration in the filter context as a share of all standard consideration in the same dates,
+    across every location, property type, tenure and build. No OSSIE_SQL_2026 expression: `REMOVEFILTERS` reads
+    or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS,
+    ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Mix
+- name: sales_prior_month
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Sales], DATEADD ( 'Date'[Date], -1, MONTH ) )
+  datatype: Decimal
+  description: 'Standard sales in the month before (dates shifted back one month). In one update file the latest
+    months are still arriving, so a rise or fall here is about registration timing as much as the market. No OSSIE_SQL_2026
+    expression: `DATEADD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence
+    functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Time
+- name: median_price_prior_month
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Median price], DATEADD ( 'Date'[Date], -1, MONTH ) )
+  datatype: Decimal
+  description: 'Median price of standard sales in the month before (dates shifted back one month). No OSSIE_SQL_2026
+    expression: `DATEADD` shifts or accumulates dates through the Power BI date table. OSSIE_SQL_2026 has no time-intelligence
+    functions, and a metric can''t move the query''s date filter.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: \£#,0
+      display_folder: Time
+- name: median_price_change
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR CurrentMedian = [Median price] VAR PriorMedian = [Median price prior month] RETURN IF ( NOT
+        ISBLANK ( CurrentMedian ) && NOT ISBLANK ( PriorMedian ), CurrentMedian - PriorMedian )
+  datatype: Decimal
+  description: 'Median price minus the median price in the month before. Blank unless both months have standard
+    sales. No OSSIE_SQL_2026 expression: Depends on `median_price_prior_month`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: +\£#,0;-\£#,0;\£0
+      display_folder: Time
+- name: attribution
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: '"Contains HM Land Registry data © Crown copyright and database right " & FORMAT ( YEAR ( CALCULATE
+        ( MAX ( ''Fact Sale''[Transfer Date] ), REMOVEFILTERS () ) ), "0" ) & ". This data is licensed under the
+        Open Government Licence v3.0."'
+  datatype: String
+  description: 'The attribution HM Land Registry and the Open Government Licence v3.0 require on anything built
+    from this data, with the year of the latest transfer loaded. Put it on every report page. No OSSIE_SQL_2026
+    expression: a citation or attribution string. Kept in the DAX dialect for reports; there is nothing to aggregate.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '@'
+      display_folder: About

@@ -1,0 +1,1201 @@
+# Apache Ossie Core Metadata Specification twin of models/cms-hospital-quality (TMDL).
+# Schema: https://github.com/apache/ossie/blob/main/core-spec/ossie-schema.json
+# Schema version const 0.3.0.dev0, fetched 25 Nov 2026 (apache/ossie main @ 7b8ed65).
+# Portable dialect: OSSIE_SQL_2026 (the `sql` key). DAX entries are opaque to Ossie.
+# Sources are logical names, not warehouse tables: the Power BI model loads through Power Query.
+# Not deployed. Validate with tools/ossie-check.
+version: 0.3.0.dev0
+name: cms_hospital_quality
+datasets:
+- name: fact_measure_result
+  source: cms_hospital_quality.fact_measure_result
+  description: 'Fact table: CMS Complications and Deaths - Hospital (dataset ynj2-r877). Grain: one row per facility
+    x measure x performance window x catalog release; the November 2026 release has 95,740 rows (4,787 facilities
+    x 20 measures). Start Date and End Date are the performance window CMS measured, not the day the file was posted;
+    Release Date is the catalog release. "Not Available" scores and estimates load as blank, never zero. Every column
+    is hidden; analysis goes through the measures and the Hospital, Quality Measure, Performance Date and Release
+    Date dimensions.'
+  fields:
+  - name: facility_id
+    expression:
+      sql: facility_id
+    datatype: String
+    description: CMS Certification Number of the hospital. Foreign key to Hospital[Facility ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: measure_id
+    expression:
+      sql: measure_id
+    datatype: String
+    description: CMS measure identifier. Foreign key to 'Quality Measure'[Measure ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: start_date
+    expression:
+      sql: start_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the performance window CMS measured (for example 2022-07-01). Inactive relationship
+      to 'Performance Date'[Date]; used by Results by window start.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: end_date
+    expression:
+      sql: end_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Last day of the performance window CMS measured (for example 2025-06-30). Active relationship to
+      'Performance Date'[Date].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: release_date
+    expression:
+      sql: release_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Catalog release the row was published in, read from the dataset's metastore entry at refresh (2026-11-12
+      for this release). Active relationship to 'Release Date'[Date]; the result measures read only the latest release
+      in context.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: score
+    expression:
+      sql: score
+    datatype: Decimal
+    description: Hospital's risk-standardized result for the measure (a rate; PSI 90 is a ratio near 1). Lower is
+      better. Blank where CMS published "Not Available". Read through Average score or Denominator weighted score.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.00'
+  - name: denominator
+    expression:
+      sql: denominator
+    datatype: Integer
+    description: Eligible cases behind the score. Blank where CMS published "Not Available", or "Not Applicable"
+      (PSI 90).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '#,0'
+  - name: lower_estimate
+    expression:
+      sql: lower_estimate
+    datatype: Decimal
+    description: Lower bound of CMS's interval estimate for the score. Blank where not published.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.00'
+  - name: higher_estimate
+    expression:
+      sql: higher_estimate
+    datatype: Decimal
+    description: Upper bound of CMS's interval estimate for the score. Blank where not published.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0.00'
+  - name: compared_to_national
+    expression:
+      sql: compared_to_national
+    datatype: String
+    description: 'CMS''s comparison with the national figure: Better/No Different/Worse Than the National Rate (or
+      Value, for PSI 90), Number of Cases Too Small, or Not Available. Read through the Comparison measures; never
+      treat Not Available as no different.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: footnote
+    expression:
+      sql: footnote
+    datatype: String
+    description: CMS footnote code(s) for the row, for example 1 or 5 (see the CMS hospital data dictionary); blank
+      when none.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  metrics:
+  - name: latest_result_release
+    expression:
+      sql: MAX(release_date)
+    datatype: Date
+    description: Latest catalog release in the filter context among measure results. Every result measure reads
+      only this release, so a hospital is never counted twice when a second release with overlapping performance
+      windows is loaded (the same rule the star measures follow).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: MAX ( 'Fact Measure Result'[Release Date] )
+        format_string: yyyy-mm-dd
+        display_folder: Audit
+- name: fact_overall_rating
+  source: cms_hospital_quality.fact_overall_rating
+  description: 'Fact table: the CMS hospital overall star rating and the per-group measure counts behind it, from
+    Hospital General Information (dataset xubh-q36u). Grain: one row per facility x catalog release; the November
+    2026 release has 5,435 rows, including hospitals with no Complications and Deaths rows. A separate fact because
+    stars have no performance window. Patient-experience and timely-care groups are left out (mostly empty in this
+    release). Every column is hidden; analysis goes through the Stars measures.'
+  fields:
+  - name: facility_id
+    expression:
+      sql: facility_id
+    datatype: String
+    description: CMS Certification Number of the hospital. Foreign key to Hospital[Facility ID].
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: release_date
+    expression:
+      sql: release_date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Catalog release the rating was published in, read from the dataset's metastore entry at refresh
+      (2026-11-12 for this release). Active relationship to 'Release Date'[Date]; not related to 'Performance Date'
+      (stars have no performance window).
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: yyyy-mm-dd
+  - name: overall_rating
+    expression:
+      sql: overall_rating
+    datatype: Integer
+    description: CMS hospital overall star rating, 1 to 5. Blank where CMS published "Not Available" (too few measures,
+      or a hospital type CMS does not rate). Read through the Stars measures.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: mortality_measures_count
+    expression:
+      sql: mortality_measures_count
+    datatype: Integer
+    description: 'Count of mortality (death-rate) measures CMS scored for the hospital in its overall star rating,
+      as CMS publishes it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital
+      count: sum it across hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: mortality_better_count
+    expression:
+      sql: mortality_better_count
+    datatype: Integer
+    description: 'Count of mortality (death-rate) measures CMS rates better than national, as CMS publishes it in
+      Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it
+      across hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: mortality_no_different_count
+    expression:
+      sql: mortality_no_different_count
+    datatype: Integer
+    description: 'Count of mortality (death-rate) measures CMS rates no different from national, as CMS publishes
+      it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count:
+      sum it across hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: mortality_worse_count
+    expression:
+      sql: mortality_worse_count
+    datatype: Integer
+    description: 'Count of mortality (death-rate) measures CMS rates worse than national, as CMS publishes it in
+      Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it
+      across hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: safety_measures_count
+    expression:
+      sql: safety_measures_count
+    datatype: Integer
+    description: 'Count of safety measures CMS scored for the hospital in its overall star rating, as CMS publishes
+      it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count:
+      sum it across hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: safety_better_count
+    expression:
+      sql: safety_better_count
+    datatype: Integer
+    description: 'Count of safety measures CMS rates better than national, as CMS publishes it in Hospital General
+      Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals
+      in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: safety_no_different_count
+    expression:
+      sql: safety_no_different_count
+    datatype: Integer
+    description: 'Count of safety measures CMS rates no different from national, as CMS publishes it in Hospital
+      General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across
+      hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: safety_worse_count
+    expression:
+      sql: safety_worse_count
+    datatype: Integer
+    description: 'Count of safety measures CMS rates worse than national, as CMS publishes it in Hospital General
+      Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals
+      in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: readmission_measures_count
+    expression:
+      sql: readmission_measures_count
+    datatype: Integer
+    description: 'Count of readmission measures CMS scored for the hospital in its overall star rating, as CMS publishes
+      it in Hospital General Information. Blank where CMS published Not Available. Already a per-hospital count:
+      sum it across hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: readmission_better_count
+    expression:
+      sql: readmission_better_count
+    datatype: Integer
+    description: 'Count of readmission measures CMS rates better than national, as CMS publishes it in Hospital
+      General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across
+      hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: readmission_no_different_count
+    expression:
+      sql: readmission_no_different_count
+    datatype: Integer
+    description: 'Count of readmission measures CMS rates no different from national, as CMS publishes it in Hospital
+      General Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across
+      hospitals in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: readmission_worse_count
+    expression:
+      sql: readmission_worse_count
+    datatype: Integer
+    description: 'Count of readmission measures CMS rates worse than national, as CMS publishes it in Hospital General
+      Information. Blank where CMS published Not Available. Already a per-hospital count: sum it across hospitals
+      in one release only.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  metrics:
+  - name: latest_release_date
+    expression:
+      sql: MAX(release_date)
+    datatype: Date
+    description: Latest catalog release date in the filter context. The star measures read only this release, so
+      hospitals are never counted twice when more releases are loaded.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: MAX ( 'Fact Overall Rating'[Release Date] )
+        format_string: yyyy-mm-dd
+        display_folder: Audit
+- name: hospital
+  source: cms_hospital_quality.hospital
+  description: 'Hospital dimension, one row per facility in CMS Hospital General Information for the current catalog
+    release (all hospital types: acute care, critical access, psychiatric, VA, children''s, DoD, cancer, long-term,
+    rural emergency). Address and telephone are the hospital''s published Care Compare contact fields, not patient
+    data; they are hidden, so keep them off visuals that do not need them. State is folded in (no separate State
+    table).'
+  primary_key:
+  - facility_id
+  fields:
+  - name: facility_id
+    expression:
+      sql: facility_id
+    datatype: String
+    description: Six-character CMS Certification Number (CCN) of the facility, text with leading zeros kept (for
+      example 010001). Primary key.
+  - name: facility_name
+    expression:
+      sql: facility_name
+    datatype: String
+    description: Facility name as CMS publishes it (upper case).
+  - name: hospital_type
+    expression:
+      sql: hospital_type
+    datatype: String
+    description: 'CMS hospital type: Acute Care Hospitals, Critical Access Hospitals, Psychiatric, Acute Care -
+      Veterans Administration, Childrens, Rural Emergency Hospital, Acute Care - Department of Defense, Dedicated
+      Cancer Care, Long-term.'
+  - name: hospital_ownership
+    expression:
+      sql: hospital_ownership
+    datatype: String
+    description: Ownership as CMS publishes it, for example Voluntary non-profit - Private or Government - Hospital
+      District or Authority.
+  - name: emergency_services
+    expression:
+      sql: emergency_services
+    datatype: String
+    description: 'Whether the hospital provides emergency services: Yes or No.'
+  - name: birthing_friendly
+    expression:
+      sql: birthing_friendly
+    datatype: String
+    description: Y when the hospital meets CMS's criteria for the birthing-friendly designation; blank otherwise
+      (blank is not "No data", it means the criteria are not met or not reported).
+  - name: address
+    expression:
+      sql: address
+    datatype: String
+    description: 'Published street address of the facility. Hidden: keep off reports unless a visual needs it.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: city
+    expression:
+      sql: city
+    datatype: String
+    description: City or town of the facility.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: City
+  - name: zip_code
+    expression:
+      sql: zip_code
+    datatype: String
+    description: Five-digit ZIP code, text with leading zeros kept.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: PostalCode
+  - name: county
+    expression:
+      sql: county
+    datatype: String
+    description: County or parish of the facility.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: County
+  - name: telephone
+    expression:
+      sql: telephone
+    datatype: String
+    description: 'Published main telephone number of the facility. Hidden: keep off reports unless a visual needs
+      it.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+  - name: state_code
+    expression:
+      sql: state_code
+    datatype: String
+    description: Two-letter USPS code of the state or territory (50 states, DC, PR, GU, VI, AS, MP).
+  - name: state_name
+    expression:
+      sql: state_name
+    datatype: String
+    description: Name of the state or territory, for example California or Puerto Rico.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        data_category: StateOrProvince
+  metrics:
+  - name: hospitals
+    expression:
+      sql: COUNT(*)
+    datatype: Integer
+    description: 'Hospitals in the Hospital table that match the Hospital filters (type, state, ownership...), whatever
+      their rating or reporting. A count of the dimension: Performance Date, Release Date and Quality Measure slicers
+      do not change it, because every relationship filters from dimension to fact. For hospitals that reported in
+      a period or on a measure use Hospitals with a result; for rated hospitals use Hospitals rated.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: COUNTROWS ( Hospital )
+        format_string: '#,0'
+        display_folder: Hospital
+  - name: birthing_friendly_hospitals
+    expression:
+      sql: COUNT(*) FILTER (WHERE birthing_friendly = 'Y')
+    datatype: Decimal
+    description: 'Hospitals that meet CMS''s birthing-friendly designation criteria (Birthing Friendly = "Y"). A
+      count of the dimension, like Hospitals: date and measure slicers do not change it.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        dax: CALCULATE ( COUNTROWS ( Hospital ), KEEPFILTERS ( Hospital[Birthing Friendly] = "Y" ) )
+        format_string: '#,0'
+        display_folder: Hospital
+- name: performance_date
+  source: cms_hospital_quality.performance_date
+  description: 'Performance-window calendar, one row per day from CalendarStart (1 January 2022) to CalendarEnd
+    (31 December of the current year). Marked as a date table. Filters ''Fact Measure Result'' by the END of the
+    performance window CMS measured (active) or its start (inactive, used by Results by window start). It does not
+    filter the star ratings, which have no window: slice those with ''Release Date''.'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to the end date (active) and start date (inactive) of 'Fact
+      Measure Result'.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+- name: quality_measure
+  source: cms_hospital_quality.quality_measure
+  description: The CMS quality measures in the Complications and Deaths file, one row per Measure ID (20 in the
+    November 2026 release), built from the distinct measure rows of the source rather than typed by hand. Every
+    measure here is lower-is-better. Scores are on different scales (death rates near 12 per 100, PSI 90 near 1),
+    so average a score within one measure only.
+  primary_key:
+  - measure_id
+  fields:
+  - name: measure_id
+    expression:
+      sql: measure_id
+    datatype: String
+    description: CMS measure identifier, for example MORT_30_AMI or PSI_90. Primary key.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Measure Sort
+  - name: measure_name
+    expression:
+      sql: measure_name
+    datatype: String
+    description: CMS measure name, for example Death rate for heart attack patients. Sorted by Measure Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Measure Sort
+  - name: family
+    expression:
+      sql: family
+    datatype: String
+    description: 'Measure family: Mortality (MORT_30_* and the hybrid hospital-wide mortality rate Hybrid_HWM),
+      Surgical complication (COMP_HIP_KNEE, ISCMR) or Patient safety (PSI_*). Sorted in that order.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Family Sort
+  - name: family_sort
+    expression:
+      sql: family_sort
+    datatype: Integer
+    description: 'Sort key for Family: 1 Mortality, 2 Surgical complication, 3 Patient safety.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: measure_sort
+    expression:
+      sql: measure_sort
+    datatype: Integer
+    description: 'Sort key for Measure ID and Measure Name: family first, then Measure ID in text order within the
+      family.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+- name: release_date
+  source: cms_hospital_quality.release_date
+  description: 'Catalog-release calendar, one row per day from CalendarStart to CalendarEnd. Marked as a date table.
+    Filters both facts by the catalog release CMS posted the data in: ''Fact Overall Rating'' (the star ratings)
+    and ''Fact Measure Result''. Use it for "which release" questions; use ''Performance Date'' for "which measurement
+    period".'
+  primary_key:
+  - date
+  fields:
+  - name: date
+    expression:
+      sql: date
+    dimension:
+      is_time: true
+    datatype: Date
+    description: Calendar date. Primary key, related to the release date of 'Fact Overall Rating' and of 'Fact Measure
+      Result'.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+  - name: year
+    expression:
+      sql: year
+    datatype: Integer
+    description: Calendar year, for example 2026.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: quarter
+    expression:
+      sql: quarter
+    datatype: String
+    description: Quarter of the year as text, Q1 to Q4. Sorted by Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Quarter Number
+  - name: quarter_number
+    expression:
+      sql: quarter_number
+    datatype: Integer
+    description: Quarter of the year as a number, 1 to 4.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: year_quarter
+    expression:
+      sql: year_quarter
+    datatype: String
+    description: Year and quarter, for example 2026 Q3. Sorted by Year Quarter Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Quarter Number
+  - name: year_quarter_number
+    expression:
+      sql: year_quarter_number
+    datatype: Integer
+    description: 'Sort key for Year Quarter: year times 10 plus quarter, for example 20263.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month
+    expression:
+      sql: month
+    datatype: String
+    description: Full month name, January to December. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_short
+    expression:
+      sql: month_short
+    datatype: String
+    description: Abbreviated month name, Jan to Dec. Sorted by Month Number.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Month Number
+  - name: month_number
+    expression:
+      sql: month_number
+    datatype: Integer
+    description: Month of the year as a number, 1 to 12.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: '0'
+  - name: year_month
+    expression:
+      sql: year_month
+    datatype: String
+    description: Year and month as YYYY-MM, for example 2026-08. Sorted by Year Month Sort.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        sort_by_column: Year Month Sort
+  - name: year_month_sort
+    expression:
+      sql: year_month_sort
+    datatype: Integer
+    description: 'Sort key for Year Month: year times 100 plus month, for example 202608.'
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        is_hidden: true
+        format_string: '0'
+  - name: month_start
+    expression:
+      sql: month_start
+    dimension:
+      is_time: true
+    datatype: Date
+    description: First day of the month.
+    nonportable_extensions:
+    - vendor_name: power_bi
+      data:
+        format_string: yyyy-mm-dd
+relationships:
+- name: fact_measure_result_to_hospital
+  from: fact_measure_result
+  to: hospital
+  from_columns:
+  - facility_id
+  to_columns:
+  - facility_id
+- name: fact_measure_result_to_quality_measure
+  from: fact_measure_result
+  to: quality_measure
+  from_columns:
+  - measure_id
+  to_columns:
+  - measure_id
+- name: fact_measure_result_to_performance_date_end_date
+  from: fact_measure_result
+  to: performance_date
+  from_columns:
+  - end_date
+  to_columns:
+  - date
+- name: fact_measure_result_to_release_date
+  from: fact_measure_result
+  to: release_date
+  from_columns:
+  - release_date
+  to_columns:
+  - date
+- name: fact_overall_rating_to_hospital
+  from: fact_overall_rating
+  to: hospital
+  from_columns:
+  - facility_id
+  to_columns:
+  - facility_id
+- name: fact_overall_rating_to_release_date
+  from: fact_overall_rating
+  to: release_date
+  from_columns:
+  - release_date
+  to_columns:
+  - date
+metrics:
+- name: results
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest result release] RETURN CALCULATE ( COUNTROWS ( 'Fact Measure Result' ),
+        'Fact Measure Result'[Release Date] = Release )
+  datatype: Decimal
+  description: 'Measure result rows in the latest catalog release in context: one per hospital and measure, whether
+    or not CMS published a score. Rows, not hospitals. No OSSIE_SQL_2026 expression: counts results in the latest
+    release inside the filters. Results are a snapshot per release.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Volume
+- name: hospitals_with_a_result
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest result release] RETURN CALCULATE ( DISTINCTCOUNT ( 'Fact Measure Result'[Facility
+        ID] ), 'Fact Measure Result'[Release Date] = Release )
+  datatype: Decimal
+  description: 'Distinct hospitals with at least one measure result row (scored or not) in the latest catalog release
+    in context. Unlike Hospitals, this follows Performance Date, Release Date and Quality Measure filters. No OSSIE_SQL_2026
+    expression: keeps only the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`).
+    One OSSIE_SQL_2026 aggregate can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Volume
+- name: reported_scores
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], KEEPFILTERS ( NOT ISBLANK ( 'Fact Measure Result'[Score] ) ) )
+  datatype: Decimal
+  description: 'Measure result rows that carry a published (numeric) score, latest release in context. CMS''s "Not
+    Available" is blank and not counted. No OSSIE_SQL_2026 expression: Depends on `results`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Volume
+- name: results_by_window_start
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], USERELATIONSHIP ( 'Fact Measure Result'[Start Date], 'Performance Date'[Date]
+        ) )
+  datatype: Decimal
+  description: 'Measure result rows counted by the start of their performance window instead of its end, latest
+    release in context (uses the inactive Start Date relationship to ''Performance Date''). No OSSIE_SQL_2026 expression:
+    `USERELATIONSHIP` reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context:
+    no ALL, REMOVEFILTERS, ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Volume
+- name: results_by_release
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], REMOVEFILTERS ( 'Performance Date' ) )
+  datatype: Decimal
+  description: 'Measure result rows by catalog release, ignoring any ''Performance Date'' filter: put ''Release
+    Date'' on the axis to see each release''s rows, whatever windows they cover. No OSSIE_SQL_2026 expression: `REMOVEFILTERS`
+    reads or removes what the report has filtered. OSSIE_SQL_2026 metrics have no filter context: no ALL, REMOVEFILTERS,
+    ISFILTERED or HASONEVALUE.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Volume
+- name: average_score
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( HASONEVALUE ( 'Quality Measure'[Measure ID] ), VAR Release = [Latest result release] RETURN
+        CALCULATE ( AVERAGE ( 'Fact Measure Result'[Score] ), 'Fact Measure Result'[Release Date] = Release ) )
+  datatype: Decimal
+  description: 'Unweighted mean of published scores in the latest catalog release in context, each hospital counting
+    once. Blank unless exactly one quality measure is in scope, because CMS measures are on different scales (a
+    death rate near 12 against PSI 90 near 1). "Not Available" scores are ignored, not counted as zero. No OSSIE_SQL_2026
+    expression: keeps only the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`).
+    One OSSIE_SQL_2026 aggregate can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Result
+- name: denominator_weighted_score
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: IF ( HASONEVALUE ( 'Quality Measure'[Measure ID] ), VAR Release = [Latest result release] VAR
+        ScoredRows = FILTER ( 'Fact Measure Result', 'Fact Measure Result'[Release Date] = Release && NOT ISBLANK
+        ( 'Fact Measure Result'[Score] ) && NOT ISBLANK ( 'Fact Measure Result'[Denominator] ) ) RETURN DIVIDE (
+        SUMX ( ScoredRows, 'Fact Measure Result'[Score] * 'Fact Measure Result'[Denominator] ), SUMX ( ScoredRows,
+        'Fact Measure Result'[Denominator] ) ) )
+  datatype: Decimal
+  description: 'Mean score weighted by each hospital''s denominator (eligible cases), over rows that have both a
+    score and a denominator, latest catalog release in context. Blank unless exactly one quality measure is in scope.
+    PSI 90 has no denominator (CMS: Not Applicable), so it is blank there. No OSSIE_SQL_2026 expression: keeps only
+    the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026
+    aggregate can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Result
+- name: total_denominator
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest result release] RETURN CALCULATE ( SUM ( 'Fact Measure Result'[Denominator]
+        ), 'Fact Measure Result'[Release Date] = Release )
+  datatype: Decimal
+  description: 'Sum of denominators (eligible cases) in the latest catalog release in context. Blank where CMS published
+    Not Available or Not Applicable. No OSSIE_SQL_2026 expression: keeps only the latest date or release inside
+    the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026 aggregate can''t pin itself
+    to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Result
+- name: better_than_national
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] IN { "Better
+        Than the National Rate", "Better Than the National Value" } ) )
+  datatype: Decimal
+  description: 'Results CMS rates better than the national rate or value (both wordings in the file). No OSSIE_SQL_2026
+    expression: Depends on `results`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Comparison
+- name: worse_than_national
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] IN { "Worse Than
+        the National Rate", "Worse Than the National Value" } ) )
+  datatype: Decimal
+  description: 'Results CMS rates worse than the national rate or value (both wordings in the file). No OSSIE_SQL_2026
+    expression: Depends on `results`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Comparison
+- name: no_different_than_national
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] IN { "No Different
+        Than the National Rate", "No Different Than the National Value" } ) )
+  datatype: Decimal
+  description: 'Results CMS rates no different from the national rate or value (both wordings in the file). No OSSIE_SQL_2026
+    expression: Depends on `results`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Comparison
+- name: too_small_to_compare
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] = "Number of
+        Cases Too Small" ) )
+  datatype: Decimal
+  description: 'Results CMS did not compare because the hospital had too few cases ("Number of Cases Too Small").
+    No OSSIE_SQL_2026 expression: Depends on `results`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Comparison
+- name: not_available_to_compare
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: CALCULATE ( [Results], KEEPFILTERS ( 'Fact Measure Result'[Compared to National] = "Not Available"
+        ) )
+  datatype: Decimal
+  description: 'Results with no comparison ("Not Available"). Every MORT_30_* death-rate row is Not Available here
+    even when a score is published, so this is not "same as national" and not "worse". No OSSIE_SQL_2026 expression:
+    Depends on `results`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Comparison
+- name: share_worse
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Worse than national], [Better than national] + [No different than national] + [Worse
+        than national] )
+  datatype: Decimal
+  description: 'Share of compared results that CMS rates worse than national: worse / (better + no different + worse).
+    Not Available and too-small results are left out of both sides. No OSSIE_SQL_2026 expression: Depends on `worse_than_national`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Comparison
+- name: share_better
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Better than national], [Better than national] + [No different than national] + [Worse
+        than national] )
+  datatype: Decimal
+  description: 'Share of compared results that CMS rates better than national: better / (better + no different +
+    worse). No OSSIE_SQL_2026 expression: Depends on `better_than_national`, which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Comparison
+- name: hospitals_rated
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest release date] RETURN CALCULATE ( COUNTROWS ( 'Fact Overall Rating' ), 'Fact
+        Overall Rating'[Release Date] = Release, KEEPFILTERS ( NOT ISBLANK ( 'Fact Overall Rating'[Overall Rating]
+        ) ) )
+  datatype: Decimal
+  description: 'Hospitals with a CMS overall star rating (1 to 5) in the latest release in context. "Not Available"
+    ratings are not counted. No OSSIE_SQL_2026 expression: keeps only the latest date or release inside the current
+    filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026 aggregate can''t pin itself to the max of
+    the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Stars
+- name: average_stars
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest release date] RETURN CALCULATE ( AVERAGE ( 'Fact Overall Rating'[Overall
+        Rating] ), 'Fact Overall Rating'[Release Date] = Release )
+  datatype: Decimal
+  description: 'Mean CMS overall star rating (1 to 5) of rated hospitals in the latest release in context, unweighted.
+    No OSSIE_SQL_2026 expression: keeps only the latest date or release inside the current filters (`VAR ... = MAX(...)`
+    then `CALCULATE`). One OSSIE_SQL_2026 aggregate can''t pin itself to the max of the query''s own rows without
+    a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '0.00'
+      display_folder: Stars
+- name: five_star_hospitals
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest release date] RETURN CALCULATE ( COUNTROWS ( 'Fact Overall Rating' ), 'Fact
+        Overall Rating'[Release Date] = Release, KEEPFILTERS ( 'Fact Overall Rating'[Overall Rating] = 5 ) )
+  datatype: Decimal
+  description: 'Rated hospitals with five stars in the latest release in context. No OSSIE_SQL_2026 expression:
+    keeps only the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One
+    OSSIE_SQL_2026 aggregate can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Stars
+- name: one_star_hospitals
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest release date] RETURN CALCULATE ( COUNTROWS ( 'Fact Overall Rating' ), 'Fact
+        Overall Rating'[Release Date] = Release, KEEPFILTERS ( 'Fact Overall Rating'[Overall Rating] = 1 ) )
+  datatype: Decimal
+  description: 'Rated hospitals with one star in the latest release in context. No OSSIE_SQL_2026 expression: keeps
+    only the latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026
+    aggregate can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Stars
+- name: five_star_share
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [Five star hospitals], [Hospitals rated] )
+  datatype: Decimal
+  description: 'Share of rated hospitals that have five stars. No OSSIE_SQL_2026 expression: Depends on `five_star_hospitals`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Stars
+- name: one_star_share
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: DIVIDE ( [One star hospitals], [Hospitals rated] )
+  datatype: Decimal
+  description: 'Share of rated hospitals that have one star. No OSSIE_SQL_2026 expression: Depends on `one_star_hospitals`,
+    which doesn''t port.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: 0.0%
+      display_folder: Stars
+- name: mortality_measures_worse
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest release date] RETURN CALCULATE ( SUM ( 'Fact Overall Rating'[Mortality Worse
+        Count] ), 'Fact Overall Rating'[Release Date] = Release )
+  datatype: Decimal
+  description: 'Sum of CMS''s per-hospital counts of mortality measures rated worse than national, in the latest
+    release in context (the counts behind the overall star rating). No OSSIE_SQL_2026 expression: keeps only the
+    latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026
+    aggregate can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Stars
+- name: safety_measures_worse
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest release date] RETURN CALCULATE ( SUM ( 'Fact Overall Rating'[Safety Worse
+        Count] ), 'Fact Overall Rating'[Release Date] = Release )
+  datatype: Decimal
+  description: 'Sum of CMS''s per-hospital counts of safety measures rated worse than national, in the latest release
+    in context (the counts behind the overall star rating). No OSSIE_SQL_2026 expression: keeps only the latest
+    date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026 aggregate
+    can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Stars
+- name: readmission_measures_worse
+  expression:
+    dialects:
+    - dialect: DAX
+      expression: VAR Release = [Latest release date] RETURN CALCULATE ( SUM ( 'Fact Overall Rating'[Readmission
+        Worse Count] ), 'Fact Overall Rating'[Release Date] = Release )
+  datatype: Decimal
+  description: 'Sum of CMS''s per-hospital counts of readmission measures rated worse than national, in the latest
+    release in context (the counts behind the overall star rating). No OSSIE_SQL_2026 expression: keeps only the
+    latest date or release inside the current filters (`VAR ... = MAX(...)` then `CALCULATE`). One OSSIE_SQL_2026
+    aggregate can''t pin itself to the max of the query''s own rows without a subquery.'
+  nonportable_extensions:
+  - vendor_name: power_bi
+    data:
+      format_string: '#,0'
+      display_folder: Stars
